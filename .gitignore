@@ -1,0 +1,7 @@
+.claude/
+CLAUDE.md
+
+# Godot generated files
+.godot/
+*.uid
+
