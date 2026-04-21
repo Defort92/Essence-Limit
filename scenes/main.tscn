@@ -1,34 +1,37 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene format=3 uid="uid://c6mnoqb16cjme"]
 
-[ext_resource type="Script" path="res://scripts/camera/game_camera.gd" id="1"]
+[ext_resource type="Script" uid="uid://b50b8obu3n0l7" path="res://scripts/camera/game_camera.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(60, 1, 60)
 
+[sub_resource type="BoxMesh" id="BoxMesh_1"]
+size = Vector3(60, 1, 60)
+
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
 albedo_color = Color(0.25, 0.22, 0.18, 1)
 
-[node name="Main" type="Node3D"]
+[node name="Main" type="Node3D" unique_id=1014595042]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="."]
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1978617156]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 15, 5)
 light_energy = 1.2
 shadow_enabled = true
 
-[node name="Camera3D" type="Camera3D" parent="."]
+[node name="Camera3D" type="Camera3D" parent="." unique_id=871679916]
 transform = Transform3D(1, 0, 0, 0, 0.5, -0.866025, 0, 0.866025, 0.5, 0, 18, 11)
 script = ExtResource("1")
 
-[node name="Floor" type="StaticBody3D" parent="."]
+[node name="Floor" type="StaticBody3D" parent="." unique_id=1526938517]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Floor" unique_id=682563532]
 shape = SubResource("BoxShape3D_1")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor"]
-mesh = BoxMesh.new()
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=2134496099]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.101438284, -1.1865907, -0.53167796)
+mesh = SubResource("BoxMesh_1")
 surface_material_override/0 = SubResource("StandardMaterial3D_1")
 
-[node name="Player" parent="." instance=ExtResource("2")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
