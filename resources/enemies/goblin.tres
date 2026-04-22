@@ -1,0 +1,18 @@
+[gd_resource type="Resource" format=3 uid="uid://buqrmtu56x0k7"]
+
+[ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+mob_type_id = "goblin"
+display_name = "Гоблин"
+max_health = 40
+attack_damage = 6
+attack_range = 1.5
+attack_cooldown = 1.5
+move_speed = 3.0
+detection_range = 8.0
+xp_reward = 30
+gold_drop_min = 1
+gold_drop_max = 5
+is_unique = false
