@@ -39,11 +39,20 @@ if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
 
 CANVAS_W = 800
 CANVAS_H = 800
-DEFAULT_VIEW_SCALE = 1            # zoom of display
-DEFAULT_CELL_SIZE = 10            # native pixel for snap
+DEFAULT_VIEW_SCALE = 0.5          # 50% — стартовый zoom
+DEFAULT_CELL_SIZE = 10
 CHROMA_TOLERANCE = 50
 OUTPUT_SUBFOLDER = "_processed"
 STATE_FILE = "_editor_state.json"
+
+# Уровни зума в процентах (% от оригинала)
+ZOOM_LEVELS = [
+    0.10, 0.15, 0.20, 0.25, 0.33, 0.40, 0.50, 0.67, 0.80,
+    1.00,
+    1.25, 1.50, 2.00, 2.50, 3.00, 4.00, 6.00, 8.00,
+]
+ZOOM_MIN = ZOOM_LEVELS[0]
+ZOOM_MAX = ZOOM_LEVELS[-1]
 
 # Палитра цветов для overlay-tint (циклически назначается слоям)
 OVERLAY_TINTS = [
@@ -56,6 +65,23 @@ OVERLAY_TINTS = [
     "#44DDFF",  # cyan
     "#FF8844",  # orange
 ]
+
+# Тёмная тема (PyCharm Darcula-style)
+DARK = {
+    "bg":          "#2b2b2b",
+    "bg_alt":      "#3c3f41",
+    "bg_active":   "#4b6eaf",
+    "fg":          "#bbbbbb",
+    "fg_active":   "#ffffff",
+    "border":      "#555555",
+    "canvas_bg":   "#1e1e1e",
+    "entry_bg":    "#45494a",
+    "button_bg":   "#4c5052",
+    "button_hover": "#5c6164",
+    "list_inactive": "#3c3f41",
+    "list_active":  "#214283",
+    "accent":      "#ffc66d",  # ярко-жёлтый для акцентов
+}
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -71,10 +97,14 @@ class SpriteLayer:
     offset_y: int = 0
     visible: bool = True
     tint_color: str = "#FFFFFF"
-    snap_cell: int = DEFAULT_CELL_SIZE   # размер native-пикселя для snap
+    snap_cell: int = DEFAULT_CELL_SIZE
     chroma_removed: bool = False
-    # undo stack — список снимков (current, offset_x, offset_y)
     history: list = field(default_factory=list)
+
+    # Кэш отрисовки — пересоздаётся только при изменении изображения / тинта / зума
+    _cache_key: tuple = field(default=None, repr=False)
+    _cached_photo: object = field(default=None, repr=False)
+    _canvas_item: int = field(default=None, repr=False)
 
     def push_history(self):
         self.history.append((self.current.copy(), self.offset_x, self.offset_y))
@@ -85,7 +115,12 @@ class SpriteLayer:
         if not self.history:
             return False
         self.current, self.offset_x, self.offset_y = self.history.pop()
+        self.invalidate_cache()
         return True
+
+    def invalidate_cache(self):
+        self._cache_key = None
+        self._cached_photo = None
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -101,11 +136,11 @@ def op_pixel_snap(img: Image.Image, cell: int) -> Image.Image:
     return small.resize((w, h), Image.NEAREST)
 
 
-def op_force_size(img: Image.Image, target_size: int) -> Image.Image:
+def op_resize_to(img: Image.Image, target_size: int) -> Image.Image:
     """
-    Уменьшить изображение до target_size (по длинной стороне) через BOX-фильтр,
-    затем NN-увеличить обратно. Жёстко привязывает к пиксельной сетке.
-    Хорошо для устранения «мыла».
+    Реально уменьшить изображение до target_size по длинной стороне.
+    Итоговый файл будет ~target_size × target_size пикселей.
+    BOX-фильтр даёт качественный downscale без размытия.
     """
     w, h = img.size
     if w >= h:
@@ -114,7 +149,17 @@ def op_force_size(img: Image.Image, target_size: int) -> Image.Image:
     else:
         new_h = target_size
         new_w = max(1, round(w * target_size / h))
-    small = img.resize((new_w, new_h), Image.BOX)
+    return img.resize((new_w, new_h), Image.BOX)
+
+
+def op_force_size(img: Image.Image, target_size: int) -> Image.Image:
+    """
+    Старый "force": downscale + upscale обратно. Размер изображения НЕ меняется,
+    но пиксели становятся крупнее. Полезно для устранения мыла, но НЕ для
+    финальных game-ready ассетов.
+    """
+    w, h = img.size
+    small = op_resize_to(img, target_size)
     return small.resize((w, h), Image.NEAREST)
 
 
@@ -254,7 +299,7 @@ class SpriteEditor:
         self.folder: Optional[Path] = None
         self.layers: dict[str, SpriteLayer] = {}      # filename → layer
         self.active_name: Optional[str] = None
-        self.view_scale: int = DEFAULT_VIEW_SCALE
+        self.view_scale: float = DEFAULT_VIEW_SCALE   # дробный масштаб (0.1 .. 8.0)
         self.baseline_y: tk.IntVar = tk.IntVar(value=600)
         self.show_baseline: tk.BooleanVar = tk.BooleanVar(value=True)
         self.show_center: tk.BooleanVar = tk.BooleanVar(value=True)
@@ -270,7 +315,88 @@ class SpriteEditor:
 
     # ── UI build ─────────────────────────────────────────────────────────────
 
+    def _apply_dark_theme(self):
+        """Тёмная тема в стиле PyCharm Darcula."""
+        self.root.configure(bg=DARK["bg"])
+
+        style = ttk.Style()
+        # clam — единственная встроенная тема, которая нормально кастомизируется
+        try:
+            style.theme_use("clam")
+        except Exception:
+            pass
+
+        # Frames
+        style.configure("TFrame", background=DARK["bg"])
+        style.configure("TLabel", background=DARK["bg"], foreground=DARK["fg"])
+        style.configure("TLabelframe", background=DARK["bg"], foreground=DARK["fg"])
+        style.configure("TLabelframe.Label",
+                        background=DARK["bg"], foreground=DARK["fg"])
+
+        # Buttons
+        style.configure("TButton",
+                        background=DARK["button_bg"],
+                        foreground=DARK["fg"],
+                        bordercolor=DARK["border"],
+                        focuscolor=DARK["bg_active"],
+                        lightcolor=DARK["button_bg"],
+                        darkcolor=DARK["button_bg"],
+                        relief="flat")
+        style.map("TButton",
+                  background=[("active", DARK["button_hover"]),
+                              ("pressed", DARK["bg_active"])],
+                  foreground=[("active", DARK["fg_active"])])
+
+        # Spinbox / Entry
+        style.configure("TSpinbox",
+                        fieldbackground=DARK["entry_bg"],
+                        foreground=DARK["fg"],
+                        bordercolor=DARK["border"],
+                        arrowcolor=DARK["fg"],
+                        background=DARK["button_bg"])
+        style.configure("TEntry",
+                        fieldbackground=DARK["entry_bg"],
+                        foreground=DARK["fg"],
+                        bordercolor=DARK["border"],
+                        insertcolor=DARK["fg"])
+
+        # Checkbutton
+        style.configure("TCheckbutton",
+                        background=DARK["bg"],
+                        foreground=DARK["fg"],
+                        indicatorbackground=DARK["entry_bg"],
+                        indicatorforeground=DARK["fg"])
+        style.map("TCheckbutton",
+                  background=[("active", DARK["bg"])],
+                  foreground=[("active", DARK["fg_active"])])
+
+        # Scrollbar
+        style.configure("Vertical.TScrollbar",
+                        background=DARK["button_bg"],
+                        troughcolor=DARK["bg"],
+                        bordercolor=DARK["border"],
+                        arrowcolor=DARK["fg"],
+                        gripcount=0)
+        style.configure("Horizontal.TScrollbar",
+                        background=DARK["button_bg"],
+                        troughcolor=DARK["bg"],
+                        bordercolor=DARK["border"],
+                        arrowcolor=DARK["fg"],
+                        gripcount=0)
+
+        # Separator
+        style.configure("TSeparator", background=DARK["border"])
+
+        # Дефолтные цвета для tk-виджетов (Canvas, Label-style и Button-tk в списке)
+        self.root.option_add("*background", DARK["bg"])
+        self.root.option_add("*foreground", DARK["fg"])
+        self.root.option_add("*Canvas.background", DARK["canvas_bg"])
+        self.root.option_add("*Label.background", DARK["bg"])
+        self.root.option_add("*Label.foreground", DARK["fg"])
+
     def _build_ui(self):
+        self._apply_dark_theme()
+
         # Top toolbar
         top = ttk.Frame(self.root)
         top.pack(side="top", fill="x", padx=4, pady=4)
@@ -282,10 +408,19 @@ class SpriteEditor:
         ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=10)
 
         ttk.Label(top, text="Zoom:").pack(side="left")
-        self.zoom_var = tk.IntVar(value=DEFAULT_VIEW_SCALE)
-        zoom_spin = ttk.Spinbox(top, from_=1, to=6, width=4, textvariable=self.zoom_var,
-                                command=self._on_zoom_changed)
-        zoom_spin.pack(side="left", padx=(4, 12))
+        self.zoom_var = tk.StringVar(value=f"{int(DEFAULT_VIEW_SCALE * 100)}%")
+        zoom_values = [f"{int(z * 100)}%" for z in ZOOM_LEVELS]
+        self.zoom_combo = ttk.Combobox(top, width=6, textvariable=self.zoom_var,
+                                        values=zoom_values, state="readonly")
+        self.zoom_combo.pack(side="left", padx=(4, 4))
+        self.zoom_combo.bind("<<ComboboxSelected>>", lambda e: self._on_zoom_changed())
+
+        ttk.Button(top, text="−", width=2,
+                   command=lambda: self._zoom_step_at_center(-1)).pack(side="left", padx=1)
+        ttk.Button(top, text="+", width=2,
+                   command=lambda: self._zoom_step_at_center(+1)).pack(side="left", padx=(1, 4))
+        ttk.Button(top, text="Fit",
+                   command=self._zoom_fit).pack(side="left", padx=(0, 12))
 
         ttk.Label(top, text="Baseline Y:").pack(side="left")
         baseline_spin = ttk.Spinbox(top, from_=0, to=2000, width=6,
@@ -316,7 +451,7 @@ class SpriteEditor:
         list_frame = ttk.Frame(left)
         list_frame.pack(fill="both", expand=True)
 
-        canvas = tk.Canvas(list_frame, highlightthickness=0)
+        canvas = tk.Canvas(list_frame, highlightthickness=0, bg=DARK["bg"])
         scrollbar = ttk.Scrollbar(list_frame, orient="vertical", command=canvas.yview)
         self.file_list_frame = ttk.Frame(canvas)
         self.file_list_frame.bind(
@@ -332,7 +467,7 @@ class SpriteEditor:
         center = ttk.Frame(main)
         center.pack(side="left", fill="both", expand=True)
 
-        self.canvas = tk.Canvas(center, bg="#1e1e1e", highlightthickness=0)
+        self.canvas = tk.Canvas(center, bg=DARK["canvas_bg"], highlightthickness=0)
         h_scroll = ttk.Scrollbar(center, orient="horizontal", command=self.canvas.xview)
         v_scroll = ttk.Scrollbar(center, orient="vertical", command=self.canvas.yview)
         self.canvas.configure(xscrollcommand=h_scroll.set, yscrollcommand=v_scroll.set)
@@ -373,16 +508,22 @@ class SpriteEditor:
         ttk.Label(right, text="↳ Авто-определяет cell, чистит палитру",
                   foreground="gray").pack(anchor="w")
 
-        # Force Size (downscale → upscale)
+        # Resize (реальное уменьшение)
+        ttk.Label(right, text="РЕАЛЬНЫЙ РЕСАЙЗ",
+                  font=("Segoe UI", 9, "bold")).pack(anchor="w", pady=(6, 0))
         size_frame = ttk.Frame(right)
-        size_frame.pack(anchor="w", fill="x", pady=(6, 2))
-        ttk.Label(size_frame, text="Размер:").pack(side="left")
+        size_frame.pack(anchor="w", fill="x", pady=(4, 2))
+        ttk.Label(size_frame, text="Px:").pack(side="left")
         self.force_size_var = tk.IntVar(value=96)
         ttk.Spinbox(size_frame, from_=16, to=512, increment=16,
                     width=5, textvariable=self.force_size_var).pack(side="left", padx=2)
-        ttk.Button(size_frame, text="📐 Force", width=10,
-                   command=self._do_force_size).pack(side="left", padx=2)
-        ttk.Label(right, text="↳ 96/128 для пиксель-арта, 1px = 1 пиксель",
+        ttk.Button(size_frame, text="↓ Активный",
+                   command=self._do_resize_active).pack(side="left", padx=2)
+        ttk.Button(right, text="↓↓ Resize ВСЕХ слоёв",
+                   command=self._do_resize_all).pack(anchor="w", fill="x", pady=2)
+        ttk.Label(right, text="↳ Реально уменьшает картинку (1024 → 96)",
+                  foreground="gray").pack(anchor="w")
+        ttk.Label(right, text="↳ Сохранится как файл 96×96",
                   foreground="gray").pack(anchor="w")
 
         # Naive snap (старый)
@@ -485,15 +626,17 @@ class SpriteEditor:
         # ЛКМ + drag = pan (как в графических редакторах)
         self.canvas.bind("<ButtonPress-1>",   self._on_pan_start)
         self.canvas.bind("<B1-Motion>",       self._on_pan_drag)
-        # Средняя кнопка = тоже pan (запасной вариант)
+        # Средняя кнопка = тоже pan
         self.canvas.bind("<ButtonPress-2>",   self._on_pan_start)
         self.canvas.bind("<B2-Motion>",       self._on_pan_drag)
 
-        # Колесо мыши = zoom (Windows: <MouseWheel>, Linux: Button-4/5)
-        self.canvas.bind("<MouseWheel>",      self._on_mouse_wheel)
-        self.canvas.bind("<Button-4>",        lambda e: self._zoom_step(+1, e))
-        self.canvas.bind("<Button-5>",        lambda e: self._zoom_step(-1, e))
-        # Чтобы canvas получал клавиатурные события
+        # Колесо мыши = zoom — используем bind_all + проверку под курсором,
+        # потому что иначе на Windows событие летит только в виджет с фокусом
+        self.root.bind_all("<MouseWheel>", self._on_mouse_wheel_global)
+        self.root.bind_all("<Button-4>",  lambda e: self._on_wheel_linux(e, +1))
+        self.root.bind_all("<Button-5>",  lambda e: self._on_wheel_linux(e, -1))
+
+        # Фокус — чтобы клавиатура работала по hover
         self.canvas.bind("<Enter>", lambda e: self.canvas.focus_set())
 
     # ── Folder I/O ───────────────────────────────────────────────────────────
@@ -532,11 +675,12 @@ class SpriteEditor:
         if self.layers:
             self.active_name = next(iter(self.layers))
             self._update_active_panel()
-        # Подобрать baseline по высоте первой картинки
-        if self.layers:
             h = next(iter(self.layers.values())).original.height
             self.baseline_y.set(int(h * 0.85))
+
         self._redraw()
+        # Авто-fit после первого рендера (нужно дождаться чтобы canvas получил размер)
+        self.root.after(100, self._zoom_fit)
         self.status.config(text=f"Загружено: {len(self.layers)} файлов из {folder}")
 
     def _save_active(self):
@@ -585,11 +729,14 @@ class SpriteEditor:
             swatch.pack(side="left", padx=2)
 
             # Active selector + name
+            is_active = (name == self.active_name)
             btn = tk.Button(
                 row, text=name, anchor="w",
-                relief="flat",
-                bg=("#2a5d8a" if name == self.active_name else "#f0f0f0"),
-                fg=("white" if name == self.active_name else "black"),
+                relief="flat", borderwidth=0,
+                bg=(DARK["list_active"] if is_active else DARK["list_inactive"]),
+                fg=(DARK["fg_active"] if is_active else DARK["fg"]),
+                activebackground=DARK["bg_active"],
+                activeforeground=DARK["fg_active"],
                 command=lambda n=name: self._set_active(n),
             )
             btn.pack(side="left", fill="x", expand=True, padx=2)
@@ -640,78 +787,181 @@ class SpriteEditor:
     # ── Canvas rendering ─────────────────────────────────────────────────────
 
     def _on_zoom_changed(self):
-        self.view_scale = max(1, int(self.zoom_var.get()))
+        """Вызывается при выборе из Combobox."""
+        try:
+            val = self.zoom_var.get().rstrip("%")
+            pct = int(val) / 100.0
+        except (ValueError, AttributeError):
+            return
+        self.view_scale = max(ZOOM_MIN, min(ZOOM_MAX, pct))
         self._redraw()
 
+    def _set_zoom_label(self):
+        pct = int(round(self.view_scale * 100))
+        self.zoom_var.set(f"{pct}%")
+
+    def _next_zoom_level(self, direction: int) -> float:
+        """Возвращает следующий уровень zoom в направлении +1 / -1."""
+        # Найти ближайший уровень
+        if direction > 0:
+            for z in ZOOM_LEVELS:
+                if z > self.view_scale + 1e-6:
+                    return z
+            return ZOOM_LEVELS[-1]
+        else:
+            for z in reversed(ZOOM_LEVELS):
+                if z < self.view_scale - 1e-6:
+                    return z
+            return ZOOM_LEVELS[0]
+
+    def _zoom_step_at_center(self, direction: int):
+        """Zoom от центра видимой области (кнопки +/−)."""
+        new_scale = self._next_zoom_level(direction)
+        if new_scale == self.view_scale:
+            return
+
+        # Центр текущего вьюпорта в canvas-координатах
+        cw = self.canvas.winfo_width()
+        ch = self.canvas.winfo_height()
+        cx = self.canvas.canvasx(cw // 2)
+        cy = self.canvas.canvasy(ch // 2)
+        img_x = cx / self.view_scale
+        img_y = cy / self.view_scale
+
+        self.view_scale = new_scale
+        self._set_zoom_label()
+        self._redraw()
+
+        new_cx = img_x * new_scale
+        new_cy = img_y * new_scale
+        bbox = self.canvas.bbox("all")
+        if bbox:
+            total_w = max(1, bbox[2])
+            total_h = max(1, bbox[3])
+            self.canvas.xview_moveto(max(0, (new_cx - cw // 2) / total_w))
+            self.canvas.yview_moveto(max(0, (new_cy - ch // 2) / total_h))
+
+    def _zoom_fit(self):
+        """Подобрать zoom чтобы все слои поместились в видимой области."""
+        if not self.layers:
+            return
+        max_w = max(l.current.size[0] for l in self.layers.values())
+        max_h = max(l.current.size[1] for l in self.layers.values())
+        cw = max(100, self.canvas.winfo_width() - 20)
+        ch = max(100, self.canvas.winfo_height() - 20)
+        fit = min(cw / max_w, ch / max_h)
+        # Снап к ближайшему уровню снизу
+        chosen = ZOOM_LEVELS[0]
+        for z in ZOOM_LEVELS:
+            if z <= fit:
+                chosen = z
+        self.view_scale = chosen
+        self._set_zoom_label()
+        self._redraw()
+        self.canvas.xview_moveto(0)
+        self.canvas.yview_moveto(0)
+
     def _redraw(self):
+        """Полная перерисовка. Использует кэш PhotoImage у каждого слоя."""
         self.canvas.delete("all")
-        self._tk_images.clear()
+        # Канвас-айди слоёв сбрасываются после delete("all")
+        for layer in self.layers.values():
+            layer._canvas_item = None
 
         if not self.layers:
             return
 
-        # Канвас рассчитываем по размеру самого большого слоя
         max_w = max(l.current.size[0] for l in self.layers.values())
         max_h = max(l.current.size[1] for l in self.layers.values())
         scale = self.view_scale
-        view_w = max_w * scale
-        view_h = max_h * scale
+        view_w = max(1, int(max_w * scale))
+        view_h = max(1, int(max_h * scale))
         self.canvas.config(scrollregion=(0, 0, view_w, view_h))
 
-        # Шахматка для прозрачности (быстрая)
-        self._draw_checker(view_w, view_h)
+        self.canvas.create_rectangle(0, 0, view_w, view_h,
+                                      fill=DARK["canvas_bg"], outline="")
 
-        # Рисуем все видимые слои
-        for name, layer in self.layers.items():
-            if not layer.visible:
-                continue
+        # Порядок отрисовки: сначала все НЕактивные как силуэты,
+        # потом активный поверх всех с реальными цветами
+        draw_order = [
+            (name, layer) for name, layer in self.layers.items()
+            if layer.visible and name != self.active_name
+        ]
+        if self.active_name and self.layers[self.active_name].visible:
+            draw_order.append((self.active_name, self.layers[self.active_name]))
+
+        for name, layer in draw_order:
             is_active = (name == self.active_name)
-            # Подкрасить тинтом если не активный, или если несколько видимых
-            visible_count = sum(1 for l in self.layers.values() if l.visible)
-            tinted = self._apply_tint(layer.current, layer.tint_color,
-                                       alpha=200 if not is_active and visible_count > 1 else 255)
-            scaled = tinted.resize(
-                (tinted.size[0] * scale, tinted.size[1] * scale),
-                Image.NEAREST
-            )
-            tk_img = ImageTk.PhotoImage(scaled)
-            self._tk_images.append(tk_img)
-            self.canvas.create_image(
-                layer.offset_x * scale,
-                layer.offset_y * scale,
+
+            if is_active:
+                # Реальные цвета, без тинта, полная непрозрачность
+                tint_key = ("real", id(layer.current))
+                cache_key = (scale, "real", id(layer.current))
+            else:
+                # Плоский силуэт цвета слоя, прозрачный
+                tint_key = ("sil", layer.tint_color, 120, id(layer.current))
+                cache_key = (scale, "sil", layer.tint_color, id(layer.current))
+
+            if layer._cache_key != cache_key:
+                if getattr(layer, "_tint_key", None) != tint_key:
+                    if is_active:
+                        # Никаких преобразований цвета — просто RGBA
+                        layer._tinted_cache = layer.current.convert("RGBA")
+                    else:
+                        layer._tinted_cache = self._apply_silhouette(
+                            layer.current, layer.tint_color, alpha=120
+                        )
+                    layer._tint_key = tint_key
+
+                tinted = layer._tinted_cache
+                tw = max(1, int(tinted.size[0] * scale))
+                th = max(1, int(tinted.size[1] * scale))
+                scaled = tinted.resize((tw, th), Image.NEAREST)
+                layer._cached_photo = ImageTk.PhotoImage(scaled)
+                layer._cache_key = cache_key
+
+            layer._canvas_item = self.canvas.create_image(
+                int(layer.offset_x * scale),
+                int(layer.offset_y * scale),
                 anchor="nw",
-                image=tk_img,
+                image=layer._cached_photo,
             )
 
-        # Overlays: baseline, center, grid
+        # Overlays
         if self.show_baseline.get():
-            y = self.baseline_y.get() * scale
-            self.canvas.create_line(0, y, view_w, y, fill="#ff3333",
+            y = int(self.baseline_y.get() * scale)
+            self.canvas.create_line(0, y, view_w, y, fill="#ff5555",
                                      width=1, dash=(4, 4))
             self.canvas.create_text(4, y - 8, anchor="nw",
                                      text=f"baseline y={self.baseline_y.get()}",
-                                     fill="#ff6666", font=("Consolas", 9))
+                                     fill="#ff8888", font=("Consolas", 9))
 
         if self.show_center.get():
-            x = (max_w // 2) * scale
-            self.canvas.create_line(x, 0, x, view_h, fill="#33ccff",
+            x = int((max_w // 2) * scale)
+            self.canvas.create_line(x, 0, x, view_h, fill="#55ccff",
                                      width=1, dash=(4, 4))
 
-        if self.show_grid.get() and scale >= 4:
-            # Сетка native-пикселей
+        if self.show_grid.get() and scale >= 4.0:
             cell = self.layers[self.active_name].snap_cell if self.active_name else DEFAULT_CELL_SIZE
-            step = cell * scale
+            step = max(1, int(cell * scale))
             for x in range(0, view_w, step):
-                self.canvas.create_line(x, 0, x, view_h, fill="#444444")
+                self.canvas.create_line(x, 0, x, view_h, fill="#555555")
             for y in range(0, view_h, step):
-                self.canvas.create_line(0, y, view_w, y, fill="#444444")
+                self.canvas.create_line(0, y, view_w, y, fill="#555555")
 
-    def _draw_checker(self, w, h, square=16):
-        # Серая фоновая заливка
-        self.canvas.create_rectangle(0, 0, w, h, fill="#2a2a2a", outline="")
+    def _move_active_only(self):
+        """Быстрое обновление позиций без пересоздания изображений (для nudge)."""
+        scale = self.view_scale
+        for name, layer in self.layers.items():
+            if layer._canvas_item is not None:
+                self.canvas.coords(
+                    layer._canvas_item,
+                    int(layer.offset_x * scale),
+                    int(layer.offset_y * scale),
+                )
 
     def _apply_tint(self, img: Image.Image, hex_color: str, alpha: int = 255) -> Image.Image:
-        """Умножает RGB на цвет тинта. Прозрачность сохраняется."""
+        """Умножает RGB на цвет тинта (сохраняет затенения)."""
         if hex_color.upper() == "#FFFFFF" and alpha == 255:
             return img
         rgba = img.convert("RGBA")
@@ -725,6 +975,25 @@ class SpriteEditor:
         if alpha < 255:
             arr[:, :, 3] *= alpha / 255.0
         return Image.fromarray(np.clip(arr, 0, 255).astype(np.uint8), "RGBA")
+
+    def _apply_silhouette(self, img: Image.Image, hex_color: str, alpha: int = 120) -> Image.Image:
+        """
+        Заменить ВСЕ непрозрачные пиксели на сплошной цвет (плоский силуэт).
+        Реальные цвета изображения игнорируются, остаётся только форма.
+        """
+        rgba = img.convert("RGBA")
+        arr = np.array(rgba)
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+        mask = arr[:, :, 3] > 0
+        arr[mask, 0] = r
+        arr[mask, 1] = g
+        arr[mask, 2] = b
+        if alpha < 255:
+            a = arr[:, :, 3].astype(np.float32) * (alpha / 255.0)
+            arr[:, :, 3] = a.astype(np.uint8)
+        return Image.fromarray(arr, "RGBA")
 
     # ── Operations ───────────────────────────────────────────────────────────
 
@@ -804,7 +1073,8 @@ class SpriteEditor:
         layer.offset_x += dx
         layer.offset_y += dy
         self._update_active_panel()
-        self._redraw()
+        # Быстро: только сдвинуть позиции на canvas без перерисовки
+        self._move_active_only()
 
     def _undo(self):
         layer = self._active()
@@ -848,28 +1118,43 @@ class SpriteEditor:
     def _on_pan_drag(self, event):
         self.canvas.scan_dragto(event.x, event.y, gain=1)
 
-    def _on_mouse_wheel(self, event):
-        """Windows: event.delta = ±120 на щелчок."""
+    def _on_mouse_wheel_global(self, event):
+        """
+        Глобальный хендлер колеса. Срабатывает только если курсор над canvas.
+        Windows: event.delta = ±120 на щелчок.
+        """
+        widget = self.root.winfo_containing(event.x_root, event.y_root)
+        if widget is not self.canvas:
+            return
+        # Преобразуем координаты в canvas-relative
+        event.x = event.x_root - self.canvas.winfo_rootx()
+        event.y = event.y_root - self.canvas.winfo_rooty()
         direction = 1 if event.delta > 0 else -1
         self._zoom_step(direction, event)
 
+    def _on_wheel_linux(self, event, direction):
+        widget = self.root.winfo_containing(event.x_root, event.y_root)
+        if widget is not self.canvas:
+            return
+        event.x = event.x_root - self.canvas.winfo_rootx()
+        event.y = event.y_root - self.canvas.winfo_rooty()
+        self._zoom_step(direction, event)
+
     def _zoom_step(self, direction: int, event):
-        """Изменить zoom с фокусом на курсор."""
-        new_scale = self.view_scale + direction
-        if new_scale < 1 or new_scale > 16:
+        """Изменить zoom с фокусом на курсор. Использует уровни ZOOM_LEVELS."""
+        new_scale = self._next_zoom_level(direction)
+        if new_scale == self.view_scale:
             return
 
-        # Координата изображения под курсором сейчас
         canvas_x = self.canvas.canvasx(event.x)
         canvas_y = self.canvas.canvasy(event.y)
         img_x = canvas_x / self.view_scale
         img_y = canvas_y / self.view_scale
 
         self.view_scale = new_scale
-        self.zoom_var.set(new_scale)
+        self._set_zoom_label()
         self._redraw()
 
-        # Прокрутить так, чтобы тот же пиксель остался под курсором
         new_canvas_x = img_x * new_scale
         new_canvas_y = img_y * new_scale
         bbox = self.canvas.bbox("all")
@@ -895,16 +1180,46 @@ class SpriteEditor:
         self._redraw()
         self.status.config(text=f"Smart Snap: k={k} colors, detected cell={detected_cell}px")
 
-    def _do_force_size(self):
+    def _do_resize_active(self):
         layer = self._active()
         if not layer:
             return
         target = max(16, int(self.force_size_var.get()))
+        old_size = layer.current.size
         layer.push_history()
-        layer.current = op_force_size(layer.current, target)
+        layer.current = op_resize_to(layer.current, target)
+        # Offset сбрасываем — он был для другого размера холста
+        layer.offset_x = 0
+        layer.offset_y = 0
+        new_size = layer.current.size
         self._update_active_panel()
         self._redraw()
-        self.status.config(text=f"Force size: {target}px по длинной стороне → NN upscale")
+        self.status.config(
+            text=f"Resize: {old_size[0]}×{old_size[1]} → {new_size[0]}×{new_size[1]}"
+        )
+
+    def _do_resize_all(self):
+        if not self.layers:
+            return
+        target = max(16, int(self.force_size_var.get()))
+        count = 0
+        for layer in self.layers.values():
+            layer.push_history()
+            layer.current = op_resize_to(layer.current, target)
+            layer.offset_x = 0
+            layer.offset_y = 0
+            count += 1
+        # Подстроить baseline под новый размер картинок
+        if self.layers:
+            new_h = next(iter(self.layers.values())).current.height
+            self.baseline_y.set(int(new_h * 0.85))
+        self._update_active_panel()
+        self._redraw()
+        # Авто-Fit после ресайза — иначе персонажи будут крошечной точкой
+        self.root.after(50, self._zoom_fit)
+        self.status.config(
+            text=f"Resize применён к {count} слоям → {target}px по длинной стороне"
+        )
 
     def _do_remove_chroma_all(self):
         count = 0
@@ -949,14 +1264,6 @@ def main():
         initial = Path(sys.argv[1])
 
     root = tk.Tk()
-    try:
-        # Лучший вид на Windows
-        style = ttk.Style()
-        if "vista" in style.theme_names():
-            style.theme_use("vista")
-    except Exception:
-        pass
-
     app = SpriteEditor(root, initial_folder=initial)
     root.mainloop()
 
