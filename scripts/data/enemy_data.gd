@@ -1,3 +1,4 @@
+## Конфигурация врага — задаётся через .tres-ресурс и назначается на сцену Enemy.
 extends Resource
 class_name EnemyData
 
@@ -18,6 +19,8 @@ class_name EnemyData
 @export var xp_reward: int = 50
 @export var gold_drop_min: int = 0
 @export var gold_drop_max: int = 5
+## Если null — предметы не выпадают; золото всё равно начисляется через gold_drop_min/max.
+@export var loot_table: LootTable
 
 @export_group("Flags")
 @export var is_unique: bool = false

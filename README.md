@@ -16,6 +16,67 @@
 
 ---
 
+## Текущее состояние проекта
+
+| Система | Файл | Статус |
+|---------|------|--------|
+| GameManager | `scripts/systems/game_manager.gd` | ✅ расы, статы, золото |
+| XPSystem | `scripts/systems/xp_system.gd` | ✅ XP, уровни (кап 100), first-kill |
+| EssenceSystem | `scripts/systems/essence_system.gd` | ✅ слоты, установка/удаление |
+| DungeonPortal | `scripts/systems/dungeon_portal.gd` | ✅ открытие/закрытие портала |
+| InventorySystem | `scripts/systems/inventory_system.gd` | ✅ рюкзак (30 слотов) |
+| StashSystem | `scripts/systems/stash_system.gd` | ✅ хранилище (100 слотов) |
+| EquipmentManager | `scripts/systems/equipment_manager.gd` | ✅ надевание/снятие снаряжения |
+| SaveSystem | `scripts/systems/save_system.gd` | ✅ JSON, 3 слота сохранения |
+| PauseManager | `scripts/systems/pause_manager.gd` | ✅ пауза / сигналы |
+| Player | `scripts/entities/player.gd` | ✅ движение, dodge, HP, статы |
+| Enemy | `scripts/entities/enemy.gd` | ✅ AI, модификаторы, лут-сигнал |
+| ItemPickup | `scripts/entities/item_pickup.gd` | ✅ автоподбор через Area3D |
+| Camera | `scripts/camera/game_camera.gd` | ✅ следит за игроком |
+| ItemData | `scripts/data/item_data.gd` | ✅ базовый класс предметов |
+| EquipmentData | `scripts/data/equipment_data.gd` | ✅ HEAD/BODY/LEGS/GLOVES/оружие/аксессуар |
+| EssenceData | `scripts/data/essence_data.gd` | ✅ Resource-класс |
+| ConsumableData | `scripts/data/consumable_data.gd` | ✅ зелья, расходники |
+| EnemyData | `scripts/data/enemy_data.gd` | ✅ + LootTable |
+| LootTable | `scripts/systems/loot_table.gd` | ✅ весовой дроп |
+| main.tscn | `scenes/main.tscn` | ✅ тестовый уровень |
+| player.tscn | `scenes/characters/player.tscn` | ✅ капсула-placeholder |
+
+---
+
+## Что нужно сделать в Godot Editor (обязательно перед запуском)
+
+### 1. Зарегистрировать Autoload-синглтоны
+
+**Project → Project Settings → Autoload**, порядок важен:
+
+| Имя | Путь |
+|-----|------|
+| GameManager | `scripts/systems/game_manager.gd` |
+| XPSystem | `scripts/systems/xp_system.gd` |
+| EssenceSystem | `scripts/systems/essence_system.gd` |
+| DungeonPortal | `scripts/systems/dungeon_portal.gd` |
+| InventorySystem | `scripts/systems/inventory_system.gd` |
+| StashSystem | `scripts/systems/stash_system.gd` |
+| EquipmentManager | `scripts/systems/equipment_manager.gd` |
+| SaveSystem | `scripts/systems/save_system.gd` |
+| PauseManager | `scripts/systems/pause_manager.gd` |
+
+### 2. Добавить Input Actions
+
+**Project → Project Settings → Input Map:**
+
+| Action | Клавиша по умолчанию |
+|--------|----------------------|
+| `move_left` | A |
+| `move_right` | D |
+| `move_up` | W |
+| `move_down` | S |
+| `dodge` | Space |
+| `pause` | Escape |
+
+---
+
 ## Этап 1 — Видимая игра
 
 - [x] **1.1** Убедиться что `main.tscn` запускается — капсула ходит по полу, камера следит
@@ -29,131 +90,127 @@
 ## Этап 2 — Создание персонажа
 
 - [ ] **2.1** Создать `scenes/ui/character_creation.tscn` — 5 кнопок рас с описанием
-- [ ] **2.2** Базовые статы зависят от расы (сила, ловкость, интеллект)
-- [ ] **2.3** Поле ввода имени персонажа
-- [ ] **2.4** Кнопка "Начать игру" → смена сцены на стартовую локацию расы
-- [ ] **2.5** Добавить в `scripts/systems/game_manager.gd` стартовые статы по расе
+- [ ] **2.2** Базовые статы из расы применяются автоматически через `GameManager.get_race_base_stats()`
+- [ ] **2.3** Поле ввода имени персонажа → `GameManager.player_name`
+- [ ] **2.4** Кнопка "Начать игру" → `SaveSystem.save(0)` → смена сцены на стартовую локацию расы
 
 ---
 
-## Этап 3 — Человеческий город
+## Этап 3 — Главное меню и пауза
 
-- [ ] **3.1** Создать `scenes/world/human_city.tscn` — карта через GridMap (пол, стены, дорога)
-- [ ] **3.2** Коллизии для стен — игрок не проходит сквозь здания
-- [ ] **3.3** Создать `scripts/world/transition_zone.gd` — Area3D-переходы по углам к локациям рас
-- [ ] **3.4** Создать `scripts/world/portal_zone.gd` — зона входа в подземелье (активна если портал открыт)
-- [ ] **3.5** NPC-заглушки на месте торговцев и ремесленников
-- [ ] **3.6** Знаки/маркеры у зон перехода
+- [ ] **3.1** `scenes/ui/main_menu.tscn` — Новая игра / Загрузить (3 слота через `SaveSystem.get_save_info()`) / Выйти
+- [ ] **3.2** `scenes/ui/pause_menu.tscn` — Продолжить / Сохранить / Выйти в меню
+  - Узел должен иметь `process_mode = WHEN_PAUSED`
+  - Слушать `PauseManager.paused` / `PauseManager.unpaused`
 
 ---
 
-## Этап 4 — Боевая система
+## Этап 4 — Человеческий город
 
-- [ ] **4.1** Добавить в `scenes/characters/player.tscn` AttackArea (Area3D перед персонажем)
-- [ ] **4.2** В `scripts/entities/player.gd`: по ЛКМ — активировать Area3D, нанести урон Enemy в зоне
-- [ ] **4.3** Уклонение (Пробел) — рывок + временный i-frame (неуязвимость ~0.3 сек)
-- [ ] **4.4** Полоска HP над головой врага (billboard ProgressBar или Label3D)
-- [ ] **4.5** Создать `scenes/characters/enemy_base.tscn` на основе `scripts/entities/enemy.gd`
-- [ ] **4.6** Смерть врага: анимация исчезновения, дроп золота/эссенции-заглушки
-- [ ] **4.7** Создать `scenes/ui/death_screen.tscn` — "Вы погибли" + кнопка возврата в город
+- [ ] **4.1** Создать `scenes/world/human_city.tscn` — карта через GridMap (пол, стены, дорога)
+- [ ] **4.2** Коллизии для стен — игрок не проходит сквозь здания
+- [ ] **4.3** Создать `scripts/world/transition_zone.gd` — Area3D-переходы по углам к локациям рас
+- [ ] **4.4** Создать `scripts/world/portal_zone.gd` — зона входа в подземелье (активна если портал открыт)
+- [ ] **4.5** NPC-заглушки на месте торговцев и ремесленников
 
 ---
 
-## Этап 5 — Инвентарь и предметы
+## Этап 5 — Боевая система
 
-- [ ] **5.1** Создать `scenes/ui/inventory.tscn` + `scripts/ui/inventory.gd` — сетка слотов (клавиша I)
-- [ ] **5.2** Слоты снаряжения: голова, тело, ноги, оружие (осн./доп. рука), 3 вспомогательных
-- [ ] **5.3** Создать `scenes/world/item_pickup.tscn` + `scripts/world/item_pickup.gd` — предмет на земле, подобрать F
-- [ ] **5.4** Надеть предмет → применить `stat_bonuses` из `EquipmentData`
-- [ ] **5.5** Панель характеристик персонажа в инвентаре
-
----
-
-## Этап 6 — Система эссенций (UI)
-
-- [ ] **6.1** Создать `scenes/ui/essence_panel.tscn` + `scripts/ui/essence_panel.gd` — слоты (кол-во = уровень)
-- [ ] **6.2** Установка эссенции: drag & drop из инвентаря в слот
-- [ ] **6.3** Удаление: только в городе, за золото (`EssenceSystem.remove()` + `GameManager.spend_gold()`)
-- [ ] **6.4** Отображение суммарных бонусов от вставленных эссенций
-- [ ] **6.5** Создать 3–5 тестовых эссенций как `.tres` в `resources/essences/`
+- [ ] **5.1** Добавить в `scenes/characters/player.tscn` AttackArea (Area3D перед персонажем)
+- [ ] **5.2** В `scripts/entities/player.gd`: по ЛКМ — активировать Area3D, нанести урон Enemy в зоне
+- [ ] **5.3** Уклонение (Пробел) — рывок + временный i-frame (неуязвимость ~0.3 сек)
+- [ ] **5.4** Полоска HP над головой врага (billboard ProgressBar или Label3D)
+- [ ] **5.5** Смерть врага: анимация исчезновения, спавн ItemPickup через сигнал `loot_dropped`
+- [ ] **5.6** Создать `scenes/ui/death_screen.tscn` — "Вы погибли" + кнопка возврата в город
 
 ---
 
-## Этап 7 — Торговля и экономика
+## Этап 6 — Инвентарь и снаряжение (UI)
 
-- [ ] **7.1** Создать `scenes/ui/shop.tscn` + `scripts/ui/shop.gd` — два столбца: товары / инвентарь
-- [ ] **7.2** Покупка за золото (`GameManager.spend_gold()`), продажа (`GameManager.add_gold()`)
-- [ ] **7.3** Создать `scenes/world/npc_merchant.tscn` — NPC с каталогом товаров
-- [ ] **7.4** NPC-ремесленник: кнопка удаления эссенции за плату
-
----
-
-## Этап 8 — Подземелье: первый этаж
-
-- [ ] **8.1** Создать `scenes/dungeon/floor_01.tscn` — лабиринт (GridMap), тёмное освещение
-- [ ] **8.2** Area3D у портала → `DungeonPortal.open_portal()` + смена сцены на floor_01
-- [ ] **8.3** Создать `scripts/components/aura_component.gd` — пассивный эффект этажа в радиусе
-- [ ] **8.4** Создать `scripts/dungeon/dungeon_floor.gd` — менеджер этажа (аура, монстры, переходы)
-- [ ] **8.5** Зона перехода на 2-й этаж (заблокирована до выполнения условия)
-- [ ] **8.6** При закрытии портала (`DungeonPortal.portal_closed`) → телепорт игрока к входу
+- [ ] **6.1** `scenes/ui/inventory.tscn` — сетка слотов (клавиша I), данные из `InventorySystem`
+- [ ] **6.2** Панель снаряжения: слоты HEAD / BODY / LEGS / GLOVES / WEAPON_MAIN / WEAPON_OFF / ACCESSORY ×3
+  - Клик по предмету в рюкзаке → `EquipmentManager.equip(item)`
+  - Клик по слоту снаряжения → `EquipmentManager.unequip_slot(slot)`
+- [ ] **6.3** `scenes/ui/stash.tscn` — хранилище (доступно только в городе)
+  - `StashSystem.deposit()` / `StashSystem.withdraw()`
+- [ ] **6.4** `scenes/world/item_pickup.tscn` — сцена для ItemPickup-скрипта с визуалом
+- [ ] **6.5** Панель характеристик: вызов `Player.get_total_stat()` по всем статам
 
 ---
 
-## Этап 9 — XP и достижения
+## Этап 7 — Система эссенций (UI)
 
-- [ ] **9.1** Проверить что `XPSystem.try_award_kill_xp()` вызывается при смерти врага (уже в `enemy.gd`)
-- [ ] **9.2** Создать `scenes/ui/xp_popup.tscn` — всплывающий "+XP" над игроком
-- [ ] **9.3** Уведомление "Новый уровень!" + сигнал о новом слоте эссенции
-- [ ] **9.4** Создать `scripts/systems/achievement_system.gd` + `.tres` в `resources/achievements/`
-- [ ] **9.5** Экран достижений в меню
-
----
-
-## Этап 10 — Стартовые локации рас
-
-- [ ] **10.1** `scenes/world/barbarian_camp.tscn` — лесной лагерь, палатки, шаман (выдаёт татуировки)
-- [ ] **10.2** `scenes/world/elf_village.tscn` — двухуровневая деревня, Area3D-подъёмники
-- [ ] **10.3** `scenes/world/demon_ruins.tscn` — тёмные разрушенные постройки, NPC обрядов
-- [ ] **10.4** `scenes/world/angel_citadel.tscn` — белые постройки, NPC жрецов
-- [ ] **10.5** Зона перехода из каждой локации → Человеческий город
+- [ ] **7.1** `scenes/ui/essence_panel.tscn` — слоты (кол-во = уровень), данные из `EssenceSystem`
+- [ ] **7.2** Установка эссенции: drag & drop из инвентаря в слот → `EssenceSystem.equip(essence)`
+- [ ] **7.3** Удаление: только в городе, за золото → `EssenceSystem.remove(index)`
+- [ ] **7.4** Создать 3–5 тестовых эссенций как `.tres` в `resources/essences/`
 
 ---
 
-## Этап 11 — Расовые механики
+## Этап 8 — Торговля и экономика
 
-- [ ] **11.1** Варвар: шаман выдаёт татуировки → пассивные бонусы (`scripts/races/barbarian_passives.gd`)
-- [ ] **11.2** Эльф: диалог с духом природы → пассивка к дальнему бою (`scripts/races/elf_passives.gd`)
-- [ ] **11.3** Демон: обряд усиления → `EssenceSystem.add_bonus_slot()` (`scripts/races/demon_ritual.gd`)
-- [ ] **11.4** Ангел: аналогично + бонус к жреческим заклинаниям (`scripts/races/angel_ritual.gd`)
-- [ ] **11.5** Человек: все типы оружия + зачарование у NPC-мага в городе
-
----
-
-## Этап 12 — Боссы этажей
-
-- [ ] **12.1** Создать `scripts/entities/boss.gd` (extends Enemy) с поддержкой фаз (`phase_thresholds: Array[float]`)
-- [ ] **12.2** Переход фаз по % HP: смена паттерна атак, усиление характеристик
-- [ ] **12.3** Создать `scripts/dungeon/boss_manager.gd` — проверяет условия появления босса на этаже
-- [ ] **12.4** Уникальный дроп с босса (редкая эссенция или предмет)
-- [ ] **12.5** Создать папку `scenes/dungeon/bosses/` и первую сцену босса
+- [ ] **8.1** `scenes/ui/shop.tscn` — два столбца: товары / инвентарь
+- [ ] **8.2** Покупка: `GameManager.spend_gold(buy_price)` + `InventorySystem.add_item()`
+- [ ] **8.3** Продажа: `InventorySystem.remove_item()` + `GameManager.add_gold(sell_price)`
+- [ ] **8.4** NPC-ремесленник: удаление эссенции за плату через `EssenceSystem.remove()`
 
 ---
 
-## Этап 13 — Все 15 этажей подземелья
+## Этап 9 — Подземелье: первый этаж
 
-- [ ] **13.1** Создать `scenes/dungeon/floor_02.tscn` ... `floor_15.tscn`
-- [ ] **13.2** `resources/dungeon_floors/` — данные каждого этажа (аура, список монстров)
-- [ ] **13.3** Прогрессия сложности: урон/HP врагов умножаются на коэффициент этажа
-- [ ] **13.4** Скрытые уникальные монстры: Area3D-триггеры с условиями появления
-- [ ] **13.5** Финальный 15-й этаж: особый босс + уникальная механика боя
+- [ ] **9.1** Создать `scenes/dungeon/floor_01.tscn` — лабиринт (GridMap), тёмное освещение
+- [ ] **9.2** Area3D у портала → `DungeonPortal.open_portal()` + смена сцены на floor_01
+- [ ] **9.3** Создать `scripts/components/aura_component.gd` — пассивный эффект этажа в радиусе
+- [ ] **9.4** Зона перехода на 2-й этаж (заблокирована до выполнения условия)
+- [ ] **9.5** При закрытии портала → телепорт игрока к входу в город
 
 ---
 
-## Этап 14 — Сохранение и загрузка
+## Этап 10 — XP и достижения
 
-- [ ] **14.1** Создать `scripts/systems/save_system.gd` — сериализация в JSON (`user://save.json`)
-- [ ] **14.2** Автосохранение при смене сцены
-- [ ] **14.3** Создать `scenes/ui/main_menu.tscn` — Новая игра / Продолжить
+- [ ] **10.1** `scenes/ui/xp_popup.tscn` — всплывающий "+XP" над игроком при начислении
+- [ ] **10.2** Уведомление "Новый уровень!" при сигнале `XPSystem.level_up`
+- [ ] **10.3** `scripts/systems/achievement_system.gd` + `.tres` в `resources/achievements/`
+
+---
+
+## Этап 11 — Стартовые локации рас
+
+- [ ] **11.1** `scenes/world/barbarian_camp.tscn` — шаман выдаёт татуировки (пассивные бонусы)
+- [ ] **11.2** `scenes/world/elf_village.tscn` — двухуровневая деревня, Area3D-подъёмники
+- [ ] **11.3** `scenes/world/demon_ruins.tscn` — NPC обрядов → `EssenceSystem.add_bonus_slot()`
+- [ ] **11.4** `scenes/world/angel_citadel.tscn` — NPC жрецов → `EssenceSystem.add_bonus_slot()`
+- [ ] **11.5** Переходы из каждой локации → Человеческий город
+
+---
+
+## Этап 12 — Расовые механики
+
+- [ ] **12.1** Варвар: шаман выдаёт татуировки → пассивные бонусы (`scripts/races/barbarian_passives.gd`)
+- [ ] **12.2** Эльф: связь с духом природы (`scripts/races/elf_passives.gd`)
+- [ ] **12.3** Демон: обряд → `EssenceSystem.add_bonus_slot()` (`scripts/races/demon_ritual.gd`)
+- [ ] **12.4** Ангел: аналогично + бонус к жреческим заклинаниям (`scripts/races/angel_ritual.gd`)
+- [ ] **12.5** Человек: зачарование оружия у NPC-мага в городе
+
+---
+
+## Этап 13 — Боссы этажей
+
+- [ ] **13.1** `scripts/entities/boss.gd` (extends Enemy) с поддержкой фаз (`phase_thresholds: Array[float]`)
+- [ ] **13.2** Переход фаз по % HP: смена паттерна атак, усиление характеристик
+- [ ] **13.3** `scripts/dungeon/boss_manager.gd` — проверяет условия появления босса
+- [ ] **13.4** Уникальный дроп с босса через LootTable
+
+---
+
+## Этап 14 — Все 15 этажей подземелья
+
+- [ ] **14.1** `scenes/dungeon/floor_02.tscn` ... `floor_15.tscn`
+- [ ] **14.2** `resources/dungeon_floors/` — данные каждого этажа (аура, список монстров)
+- [ ] **14.3** Прогрессия сложности: урон/HP врагов умножаются на коэффициент этажа
+- [ ] **14.4** Скрытые уникальные монстры: Area3D-триггеры с условиями появления
+- [ ] **14.5** Финальный 15-й этаж: особый босс + уникальная механика
 
 ---
 
@@ -163,21 +220,3 @@
 - [ ] **15.2** Частицы: удар, смерть врага, подбор предмета (`GPUParticles3D`)
 - [ ] **15.3** Анимации idle / walk / attack через `AnimationPlayer`
 - [ ] **15.4** Оптимизация: пул объектов для врагов, occlusion culling
-
----
-
-## Текущее состояние проекта
-
-| Система | Файл | Статус |
-|---------|------|--------|
-| GameManager | `scripts/systems/game_manager.gd` | ✅ базовый |
-| EssenceSystem | `scripts/systems/essence_system.gd` | ✅ базовый |
-| XPSystem | `scripts/systems/xp_system.gd` | ✅ базовый |
-| DungeonPortal | `scripts/systems/dungeon_portal.gd` | ✅ базовый |
-| Player | `scripts/entities/player.gd` | ✅ движение + dodge |
-| Enemy | `scripts/entities/enemy.gd` | ✅ базовый AI |
-| Camera | `scripts/camera/game_camera.gd` | ✅ следит за игроком |
-| EssenceData | `scripts/data/essence_data.gd` | ✅ Resource-класс |
-| EquipmentData | `scripts/data/equipment_data.gd` | ✅ Resource-класс |
-| main.tscn | `scenes/main.tscn` | ✅ тестовый уровень |
-| player.tscn | `scenes/characters/player.tscn` | ✅ капсула-placeholder |

@@ -1,18 +1,10 @@
-extends Resource
+## Эссенция — вставляется в слот персонажа, даёт пассивные статы и активную способность.
+## Слотов у персонажа ровно столько, сколько его уровень (+ расовые бонусы для Демонов/Ангелов).
+## Удалить эссенцию можно только в городе за removal_cost золота.
+extends ItemData
 class_name EssenceData
 
-@export var id: String = ""
-@export var display_name: String = ""
-@export var description: String = ""
-@export var icon: Texture2D
-
-# Фиксированные бонусы к характеристикам
-@export var stat_bonuses: Dictionary = {
-	# "max_health": 0, "strength": 0, "agility": 0, "intellect": 0
-}
-
-# Активная способность (ссылка на скрипт или PackedScene)
+## Ключи — названия статов: "strength", "agility", "intellect", "max_health".
+@export var stat_bonuses: Dictionary = {}
 @export var ability_scene: PackedScene
-
-# Цена удаления в городе
 @export var removal_cost: int = 100
