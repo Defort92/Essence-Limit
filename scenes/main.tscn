@@ -1,7 +1,10 @@
 [gd_scene format=3 uid="uid://c6mnoqb16cjme"]
 
 [ext_resource type="Script" uid="uid://b50b8obu3n0l7" path="res://scripts/camera/game_camera.gd" id="1"]
-[ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2"]
+[ext_resource type="PackedScene" uid="uid://o0kyfh8ytad1" path="res://scenes/characters/player.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/characters/enemy_base.tscn" id="4"]
+[ext_resource type="Resource" uid="uid://buqrmtu56x0k7" path="res://resources/enemies/goblin.tres" id="5"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(60, 1, 60)
@@ -30,8 +33,14 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 shape = SubResource("BoxShape3D_1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=2134496099]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.101438284, -1.1865907, -0.53167796)
 mesh = SubResource("BoxMesh_1")
 surface_material_override/0 = SubResource("StandardMaterial3D_1")
 
 [node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8525088, 0)
+
+[node name="HUD" parent="." unique_id=1866468055 instance=ExtResource("3")]
+
+[node name="Goblin" parent="." unique_id=1353285753 instance=ExtResource("4")]
+transform = Transform3D(1, 0, 0, 0, 0.99999905, 0.0013438966, 0, -0.0013438966, 0.99999905, 5, 0, 0)
+data = ExtResource("5")

@@ -1,0 +1,8 @@
+# Essence Limit — Python tooling dependencies
+# Install with: pip install -r requirements.txt
+
+Pillow>=10.0.0    # image processing (process_anchor, build_spritesheet, sprite_editor)
+numpy>=1.24.0     # array ops for chroma key, foot-baseline detection, tint blending
+
+# Note: tkinter is used by sprite_editor but ships with Python on Windows —
+# no separate install needed.

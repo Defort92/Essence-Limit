@@ -5,3 +5,19 @@ CLAUDE.md
 .godot/
 *.uid
 
+.idea
+__pypackages__/
+__pycache__/
+.env
+.envrc
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+
+.pytype/
+.abstra/
+.ruff_cache/

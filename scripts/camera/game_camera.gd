@@ -5,7 +5,7 @@ const PITCH_DEG: float = -60.0
 const FOLLOW_SPEED: float = 8.0
 
 # Смещение камеры относительно цели в мировых координатах
-@export var offset: Vector3 = Vector3(0.0, 18.0, 11.0)
+@export var offset: Vector3 = Vector3(0.0, 10.0, 10.0)
 
 var _target: Node3D
 
