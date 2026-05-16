@@ -1,4 +1,5 @@
 ## Глобальное состояние персонажа: раса, имя, золото, базовые статы по расам.
+## Содержит new_game() — единственную точку сброса всех систем при старте новой игры.
 ## Является Autoload-синглтоном; регистрировать как "GameManager" в Project Settings.
 extends Node
 
@@ -9,13 +10,18 @@ var player_name: String = ""
 var gold: int = 0
 
 ## Временное хранилище HP для восстановления после загрузки сохранения.
-## SaveSystem устанавливает это значение; Player читает его в _init_race_stats().
+## SaveSystem устанавливает перед сменой сцены; Player читает в _init_race_stats().
 var saved_health: int = -1
 
+## Временное хранилище quick_slots для восстановления после загрузки сохранения.
+## SaveSystem устанавливает перед сменой сцены; Player читает в _ready().
+var saved_quick_slots: Array = ["", "", "", ""]
+
 signal gold_changed(new_amount: int)
+signal new_game_started(race: Race, player_name: String)
+signal player_died()
 
 ## Начальные статы при создании персонажа.
-## Ключи: "max_health", "strength", "agility", "intellect".
 const RACE_BASE_STATS := {
 	Race.HUMAN:     { "max_health": 100, "strength": 10, "agility": 10, "intellect": 10 },
 	Race.BARBARIAN: { "max_health": 150, "strength": 14, "agility":  8, "intellect":  5 },
@@ -25,8 +31,6 @@ const RACE_BASE_STATS := {
 }
 
 ## Прибавка к max_health за каждый уровень.
-## Согласно дизайну (CLAUDE.md) уровень даёт только слот эссенции;
-## небольшой прирост HP — единственный пассивный рост характеристик.
 const RACE_LEVEL_HP_BONUS := {
 	Race.HUMAN:     5,
 	Race.BARBARIAN: 10,
@@ -35,12 +39,46 @@ const RACE_LEVEL_HP_BONUS := {
 	Race.ANGEL:     4,
 }
 
+## Сбрасывает все игровые системы и запускает новую игру с выбранной расой и именем.
+## Вызывать из экрана создания персонажа перед сменой сцены.
+func new_game(race: Race, name: String) -> void:
+	player_race = race
+	player_name = name
+	gold = 0
+	saved_health = -1
+	saved_quick_slots = ["", "", "", ""]
+	gold_changed.emit(gold)
+
+	XPSystem.current_xp = 0
+	XPSystem.current_level = 1
+	XPSystem.killed_mob_types.clear()
+	XPSystem.bosses_killed_this_run.clear()
+
+	EssenceSystem.slots.clear()
+	EssenceSystem.bonus_slots = 0
+	EssenceSystem.resize_to_level(1)
+
+	InventorySystem.clear()
+	StashSystem.clear()
+	EquipmentManager.clear()
+	AbilityManager.clear()
+	RacialPassiveSystem.clear()
+	AchievementSystem.clear()
+
+	new_game_started.emit(race, name)
+
+## Обрабатывает смерть игрока: закрывает портал и испускает сигнал для SceneManager/UI.
+## Вызывается Player при срабатывании сигнала died.
+func on_player_died() -> void:
+	DungeonPortal.close_portal()
+	saved_health = -1  # Полное HP при возрождении
+	player_died.emit()
+
 ## Возвращает стартовые статы для [param race].
 func get_race_base_stats(race: Race) -> Dictionary:
 	return RACE_BASE_STATS.get(race, RACE_BASE_STATS[Race.HUMAN])
 
-## Возвращает бонус за один уровень для [param race].
-## Содержит только ключ "max_health".
+## Возвращает бонус HP за один уровень для [param race].
 func get_race_level_bonus(race: Race) -> Dictionary:
 	return { "max_health": RACE_LEVEL_HP_BONUS.get(race, 5) }
 

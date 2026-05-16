@@ -1,5 +1,5 @@
 ## Персонаж игрока: движение, уклонение, атака, блок, HP, статы с модификаторами.
-## Статы = base (раса + уровень) + EquipmentManager + EssenceSystem + _modifiers (ауры, достижения).
+## Статы = base (раса + уровень) + EquipmentManager + EssenceSystem + _modifiers.
 ## Добавляется в группу "player" для поиска через get_first_node_in_group.
 extends CharacterBody3D
 class_name Player
@@ -11,11 +11,10 @@ const DODGE_SPEED: float = 12.0
 const DODGE_DURATION: float = 0.25
 
 # --- Константы боя ---
-## Длительность состояния ATTACK (блокировка повторного удара), не путать с cooldown атаки.
+## Длительность состояния ATTACK (окно блокировки повторного удара).
 const ATTACK_STATE_DURATION: float = 0.3
-## Снижение урона при блоке щитом (0.0–1.0).
+## Снижение урона при активном блоке щитом (0.0–1.0).
 const BLOCK_DAMAGE_REDUCTION: float = 0.5
-## Кулдаун и урон безоружной атаки.
 const UNARMED_COOLDOWN: float = 0.6
 const UNARMED_DAMAGE_BASE: int = 3
 const UNARMED_RANGE: float = 1.2
@@ -26,27 +25,27 @@ var state: State = State.IDLE
 var _dodge_timer: float = 0.0
 var _dodge_direction: Vector3 = Vector3.ZERO
 var _last_move_dir: Vector3 = Vector3.BACK
+var _attack_timer: float = 0.0
+var _attack_state_timer: float = 0.0
 
-var _attack_timer: float = 0.0        # кулдаун между ударами
-var _attack_state_timer: float = 0.0  # длительность состояния ATTACK
-
+## true во время уклонения — игрок не получает урон (i-frames).
+var _is_invincible: bool = false
 var is_blocking: bool = false
 
 # --- Статы ---
-## Базовый максимум HP (раса + повышения уровня). Не включает бонусы от снаряжения/эссенций.
+## База HP (раса + уровень). Не включает бонусы снаряжения/эссенций.
 var base_max_health: int = 100
-## Итоговый максимум HP с учётом всех бонусов. Пересчитывается через _recalculate_derived_stats().
+## Итоговый максимум HP. Пересчитывается через _recalculate_derived_stats().
 var max_health: int = 100
 var health: int = 100
 var base_strength: int = 10
 var base_agility: int = 10
 var base_intellect: int = 10
 
-## Временные модификаторы от аур, достижений и других внешних источников.
+## Временные модификаторы от аур, расходников, достижений.
 var _modifiers: Array[StatModifier] = []
 
-## Быстрые слоты расходников (item_id). Пустая строка — слот не назначен.
-## Назначаются через UI; используются клавишами 1–4.
+## Быстрые слоты расходников (item_id). Назначаются из UI, используются клавишами 1–4.
 var quick_slots: Array[String] = ["", "", "", ""]
 
 var is_in_town: bool = true
@@ -57,12 +56,14 @@ signal died()
 func _ready() -> void:
 	add_to_group("player")
 	_init_race_stats()
+	AchievementSystem.apply_accumulated_to_player(self)
 	EssenceSystem.resize_to_level(XPSystem.current_level)
 	DungeonPortal.portal_closed.connect(_on_portal_closed)
 	XPSystem.level_up.connect(_on_level_up)
 	EssenceSystem.essence_equipped.connect(_on_essence_changed)
 	EssenceSystem.essence_removed.connect(_on_essence_slot_cleared)
 	EquipmentManager.equipment_changed.connect(_on_equipment_changed)
+	died.connect(GameManager.on_player_died)
 
 func _physics_process(delta: float) -> void:
 	if _attack_timer > 0.0:
@@ -91,9 +92,9 @@ func _physics_process(delta: float) -> void:
 
 # ─── Здоровье ──────────────────────────────────────────────────────────────
 
-## Применяет урон с учётом защиты и активного блока щитом.
+## Применяет урон с учётом защиты, блока и i-frames.
 func take_damage(amount: int) -> void:
-	if state == State.DEAD:
+	if state == State.DEAD or _is_invincible:
 		return
 	var defense := get_total_stat("defense")
 	var actual_damage := max(1, amount - defense)
@@ -113,6 +114,7 @@ func heal(amount: int) -> void:
 # ─── Статы ─────────────────────────────────────────────────────────────────
 
 ## Возвращает итоговое значение стата с учётом снаряжения, эссенций и модификаторов.
+## Формула: (base + equipment + essence + ADD_mods) * MULTIPLY_mods.
 func get_total_stat(stat_name: String) -> int:
 	if stat_name == "max_health":
 		return max_health
@@ -121,12 +123,15 @@ func get_total_stat(stat_name: String) -> int:
 		"strength":  base_value = base_strength
 		"agility":   base_value = base_agility
 		"intellect": base_value = base_intellect
-	return base_value \
-		+ EquipmentManager.get_total_stat(stat_name) \
-		+ EssenceSystem.get_total_stat(stat_name) \
-		+ _get_modifier_sum(stat_name)
+	var pool := float(
+		base_value
+		+ EquipmentManager.get_total_stat(stat_name)
+		+ EssenceSystem.get_total_stat(stat_name)
+		+ _sum_add_modifiers(stat_name)
+	)
+	return int(pool * _product_multiply_modifiers(stat_name))
 
-## Добавляет временный модификатор стата (от ауры, эффекта способности и т.д.).
+## Добавляет временный модификатор стата (от ауры, расходника, достижения и т.д.).
 func apply_modifier(modifier: StatModifier) -> void:
 	_modifiers.append(modifier)
 	_recalculate_derived_stats()
@@ -181,13 +186,12 @@ func _perform_melee_attack() -> void:
 		enemy.take_damage(atk_damage)
 
 func _perform_ranged_attack(weapon: EquipmentData) -> void:
-	# Временная реализация: хит ближайшего врага в радиусе.
+	# Временная реализация: мгновенный хит ближайшего врага в радиусе.
 	# Заменить на ProjectileComponent когда добавится визуал.
-	var atk_range: float = weapon.stat_bonuses.get("range", 10.0)
+	var atk_range: float = float(weapon.stat_bonuses.get("range", 10.0))
 	var atk_damage := _get_attack_damage()
 	var nearest_enemy: Node3D = null
 	var nearest_dist: float = atk_range
-
 	for enemy in get_tree().get_nodes_in_group("enemies"):
 		if not is_instance_valid(enemy):
 			continue
@@ -195,7 +199,6 @@ func _perform_ranged_attack(weapon: EquipmentData) -> void:
 		if dist < nearest_dist:
 			nearest_dist = dist
 			nearest_enemy = enemy
-
 	if nearest_enemy != null and nearest_enemy.has_method("take_damage"):
 		nearest_enemy.take_damage(atk_damage)
 
@@ -203,8 +206,8 @@ func _get_attack_damage() -> int:
 	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null:
 		var weapon_damage: int = weapon.stat_bonuses.get("damage", 0)
-		return weapon_damage + base_strength / 2
-	return max(1, UNARMED_DAMAGE_BASE + base_strength / 3)
+		return weapon_damage + get_total_stat("strength") / 2
+	return max(1, UNARMED_DAMAGE_BASE + get_total_stat("strength") / 3)
 
 func _get_attack_cooldown() -> float:
 	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
@@ -236,7 +239,6 @@ func _has_shield() -> bool:
 func _handle_movement(_delta: float) -> void:
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var direction := Vector3(input.x, 0.0, input.y)
-
 	if direction.length_squared() > 0.01:
 		direction = direction.normalized()
 		_last_move_dir = direction
@@ -255,6 +257,7 @@ func _handle_dodge_input() -> void:
 		state = State.DODGE
 		_dodge_timer = DODGE_DURATION
 		_dodge_direction = _last_move_dir
+		_is_invincible = true
 
 func _tick_dodge(delta: float) -> void:
 	_dodge_timer -= delta
@@ -262,6 +265,7 @@ func _tick_dodge(delta: float) -> void:
 	velocity.z = _dodge_direction.z * DODGE_SPEED
 	if _dodge_timer <= 0.0:
 		state = State.IDLE
+		_is_invincible = false
 
 # ─── Расходники ────────────────────────────────────────────────────────────
 
@@ -277,6 +281,12 @@ func _use_quick_slot(slot_idx: int) -> void:
 		return
 	InventorySystem.use_consumable(item_id, self)
 
+## Назначает предмет на быстрый слот. Вызывается из UI инвентаря.
+func set_quick_slot(slot_idx: int, item_id: String) -> void:
+	if slot_idx < 0 or slot_idx >= quick_slots.size():
+		return
+	quick_slots[slot_idx] = item_id
+
 # ─── Инициализация и пересчёт статов ───────────────────────────────────────
 
 func _init_race_stats() -> void:
@@ -286,7 +296,13 @@ func _init_race_stats() -> void:
 	base_agility    = stats.get("agility", 10)
 	base_intellect  = stats.get("intellect", 10)
 
-	# SaveSystem заранее записывает saved_health при загрузке, иначе -1 → старт с полным HP.
+	# Восстановить quick_slots из сохранения если есть.
+	var saved := GameManager.saved_quick_slots
+	if saved.size() == quick_slots.size():
+		quick_slots = saved.duplicate()
+		GameManager.saved_quick_slots = ["", "", "", ""]
+
+	# SaveSystem записывает saved_health при загрузке; -1 → старт с полным HP.
 	health = GameManager.saved_health if GameManager.saved_health > 0 else base_max_health
 	GameManager.saved_health = -1
 
@@ -306,27 +322,38 @@ func _on_essence_slot_cleared(_slot_index: int) -> void:
 func _on_equipment_changed() -> void:
 	_recalculate_derived_stats()
 
-## Пересчитывает max_health и подгоняет health пропорционально.
+## Пересчитывает max_health по формуле (base + ADD_mods) * MULTIPLY_mods.
 func _recalculate_derived_stats() -> void:
 	var old_max := max_health
-	max_health = base_max_health \
-		+ EquipmentManager.get_total_stat("max_health") \
-		+ EssenceSystem.get_total_stat("max_health") \
-		+ _get_modifier_sum("max_health")
+	var pool := float(
+		base_max_health
+		+ EquipmentManager.get_total_stat("max_health")
+		+ EssenceSystem.get_total_stat("max_health")
+		+ _sum_add_modifiers("max_health")
+	)
+	max_health = max(1, int(pool * _product_multiply_modifiers("max_health")))
 
 	if old_max > 0 and max_health != old_max:
-		var ratio := float(health) / float(old_max)
-		health = max(1, int(float(max_health) * ratio))
+		health = max(1, int(float(health) / float(old_max) * float(max_health)))
 
 	health = min(health, max_health)
 	health_changed.emit(health, max_health)
 
-func _get_modifier_sum(stat_name: String) -> int:
+## Суммирует ADD-модификаторы для стата [param stat_name].
+func _sum_add_modifiers(stat_name: String) -> int:
 	var total := 0
 	for modifier in _modifiers:
 		if modifier.stat == stat_name and modifier.op == StatModifier.Op.ADD:
 			total += int(modifier.value)
 	return total
+
+## Перемножает все MULTIPLY-модификаторы для стата [param stat_name].
+func _product_multiply_modifiers(stat_name: String) -> float:
+	var product := 1.0
+	for modifier in _modifiers:
+		if modifier.stat == stat_name and modifier.op == StatModifier.Op.MULTIPLY:
+			product *= modifier.value
+	return product
 
 func _on_portal_closed() -> void:
 	is_in_town = true

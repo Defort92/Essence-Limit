@@ -29,6 +29,10 @@ from tkinter import ttk, filedialog, messagebox, colorchooser
 import numpy as np
 from PIL import Image, ImageTk, ImageOps
 
+# Локальные модули
+import video as video_mod
+import spritesheet as ss_mod
+
 if sys.stdout.encoding and sys.stdout.encoding.lower() not in ("utf-8", "utf8"):
     sys.stdout.reconfigure(encoding="utf-8")
 
@@ -300,6 +304,13 @@ class SpriteEditor:
         self.layers: dict[str, SpriteLayer] = {}      # filename → layer
         self.active_name: Optional[str] = None
         self.view_scale: float = DEFAULT_VIEW_SCALE   # дробный масштаб (0.1 .. 8.0)
+
+        # Playback (превью анимации)
+        self.playback_on: bool = False
+        self.playback_idx: int = 0
+        self.playback_after_id: Optional[str] = None
+        self._playback_item: Optional[int] = None     # один shared canvas item для всех кадров плейбэка
+        self._playback_frame_drift_warned: bool = False
         self.baseline_y: tk.IntVar = tk.IntVar(value=600)
         self.show_baseline: tk.BooleanVar = tk.BooleanVar(value=True)
         self.show_center: tk.BooleanVar = tk.BooleanVar(value=True)
@@ -401,9 +412,12 @@ class SpriteEditor:
         top = ttk.Frame(self.root)
         top.pack(side="top", fill="x", padx=4, pady=4)
 
-        ttk.Button(top, text="📂 Открыть папку", command=self._open_folder).pack(side="left")
-        ttk.Button(top, text="💾 Сохранить активный", command=self._save_active).pack(side="left", padx=(8, 0))
-        ttk.Button(top, text="💾💾 Сохранить ВСЕ", command=self._save_all).pack(side="left", padx=(4, 0))
+        ttk.Button(top, text="📂 Папка", command=self._open_folder).pack(side="left")
+        ttk.Button(top, text="📹 Видео", command=self._open_video).pack(side="left", padx=(4, 0))
+        ttk.Button(top, text="💾 Активный", command=self._save_active).pack(side="left", padx=(8, 0))
+        ttk.Button(top, text="💾💾 ВСЕ", command=self._save_all).pack(side="left", padx=(4, 0))
+        ttk.Button(top, text="🎬 Pack Spritesheet",
+                   command=self._open_pack_dialog).pack(side="left", padx=(8, 0))
 
         ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=10)
 
@@ -421,6 +435,28 @@ class SpriteEditor:
                    command=lambda: self._zoom_step_at_center(+1)).pack(side="left", padx=(1, 4))
         ttk.Button(top, text="Fit",
                    command=self._zoom_fit).pack(side="left", padx=(0, 12))
+
+        # ── Playback (превью анимации) ──────────────────────────────────────
+        ttk.Separator(top, orient="vertical").pack(side="left", fill="y", padx=4)
+
+        self.play_btn = ttk.Button(top, text="▶ Play", width=8,
+                                    command=self._toggle_playback)
+        self.play_btn.pack(side="left", padx=(4, 2))
+
+        ttk.Button(top, text="⏮", width=2,
+                    command=lambda: self._scrub(0)).pack(side="left", padx=1)
+        ttk.Button(top, text="◀", width=2,
+                    command=lambda: self._scrub(self.playback_idx - 1)).pack(side="left", padx=1)
+        ttk.Button(top, text="▶", width=2,
+                    command=lambda: self._scrub(self.playback_idx + 1)).pack(side="left", padx=1)
+
+        ttk.Label(top, text="FPS:").pack(side="left", padx=(8, 2))
+        self.play_fps = tk.IntVar(value=10)
+        ttk.Spinbox(top, from_=1, to=60, width=4,
+                     textvariable=self.play_fps).pack(side="left")
+
+        self.frame_indicator = ttk.Label(top, text="0 / 0", width=10)
+        self.frame_indicator.pack(side="left", padx=(8, 0))
 
         ttk.Label(top, text="Baseline Y:").pack(side="left")
         baseline_spin = ttk.Spinbox(top, from_=0, to=2000, width=6,
@@ -621,6 +657,9 @@ class SpriteEditor:
         self.root.bind("<Shift-Down>",  lambda e: self._nudge(0, 8))
         self.root.bind("<Control-z>", lambda e: self._undo())
         self.root.bind("<Control-s>", lambda e: self._save_active())
+        # Плеер: Space — play/pause, Esc — выйти из превью
+        self.root.bind("<space>", lambda e: self._toggle_playback())
+        self.root.bind("<Escape>", lambda e: self._exit_playback())
 
         # ── Мышь на canvas ──────────────────────────────────────────────────
         # ЛКМ + drag = pan (как в графических редакторах)
@@ -683,6 +722,281 @@ class SpriteEditor:
         self.root.after(100, self._zoom_fit)
         self.status.config(text=f"Загружено: {len(self.layers)} файлов из {folder}")
 
+    # ── Video loading ────────────────────────────────────────────────────────
+
+    def _open_video(self):
+        """Открыть видео и извлечь кадры как слои."""
+        video_path = filedialog.askopenfilename(
+            title="Видео-файл",
+            filetypes=[
+                ("Видео", "*.mp4 *.webm *.mov *.avi *.mkv *.gif"),
+                ("Все файлы", "*.*"),
+            ],
+        )
+        if not video_path:
+            return
+
+        # Диалог параметров
+        params = self._ask_video_params(Path(video_path))
+        if params is None:
+            return
+        every_n, max_frames, start_frame, out_folder = params
+
+        # Загрузка с прогрессом в статусбаре
+        self.status.config(text="Загрузка видео…")
+        self.root.update_idletasks()
+
+        try:
+            frames = video_mod.load_frames_list(
+                Path(video_path),
+                every_n=every_n,
+                max_frames=max_frames,
+                start_frame=start_frame,
+            )
+        except RuntimeError as ex:
+            messagebox.showerror("Видео", str(ex))
+            return
+        except Exception as ex:
+            messagebox.showerror("Ошибка загрузки видео", str(ex))
+            return
+
+        if not frames:
+            messagebox.showwarning("Пусто", "Не удалось извлечь ни одного кадра.")
+            return
+
+        # Заполняем layers как при загрузке папки
+        self.folder = out_folder
+        self.layers.clear()
+        self.active_name = None
+
+        for name, img in frames:
+            # path синтетический — для сохранения нужен только filename
+            layer = SpriteLayer(
+                path=out_folder / name,
+                original=img.copy(),
+                current=img.copy(),
+            )
+            self.layers[name] = layer
+
+        self._auto_assign_tints()
+        self._rebuild_file_list()
+        if self.layers:
+            self.active_name = next(iter(self.layers))
+            self._update_active_panel()
+            h = next(iter(self.layers.values())).original.height
+            self.baseline_y.set(int(h * 0.85))
+
+        self._redraw()
+        self.root.after(100, self._zoom_fit)
+        self.status.config(
+            text=f"Загружено {len(self.layers)} кадров из видео → "
+                 f"выход в {out_folder}"
+        )
+
+    def _ask_video_params(self, video_path: Path):
+        """Маленький диалог: every_n, max_frames, start_frame, output_folder."""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Параметры видео")
+        dialog.configure(bg=DARK["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.geometry("420x280")
+
+        result = {"ok": False}
+
+        # Подсказка: число кадров
+        total = video_mod.count_frames(video_path)
+        info_text = f"Файл: {video_path.name}"
+        if total > 0:
+            info_text += f"\nКадров всего: ~{total}"
+        ttk.Label(dialog, text=info_text, justify="left").pack(
+            anchor="w", padx=12, pady=(10, 4))
+
+        # every_n
+        f1 = ttk.Frame(dialog); f1.pack(fill="x", padx=12, pady=4)
+        ttk.Label(f1, text="Брать каждый N-й кадр:").pack(side="left")
+        every_var = tk.IntVar(value=4)
+        ttk.Spinbox(f1, from_=1, to=60, width=6, textvariable=every_var).pack(side="left", padx=8)
+
+        # max_frames
+        f2 = ttk.Frame(dialog); f2.pack(fill="x", padx=12, pady=4)
+        ttk.Label(f2, text="Максимум кадров:").pack(side="left")
+        max_var = tk.IntVar(value=24)
+        ttk.Spinbox(f2, from_=1, to=500, width=6, textvariable=max_var).pack(side="left", padx=8)
+
+        # start_frame
+        f3 = ttk.Frame(dialog); f3.pack(fill="x", padx=12, pady=4)
+        ttk.Label(f3, text="Пропустить кадров в начале:").pack(side="left")
+        start_var = tk.IntVar(value=0)
+        ttk.Spinbox(f3, from_=0, to=10000, width=6, textvariable=start_var).pack(side="left", padx=8)
+
+        # output folder
+        f4 = ttk.Frame(dialog); f4.pack(fill="x", padx=12, pady=4)
+        ttk.Label(f4, text="Папка для вывода:").pack(side="left")
+        default_out = str(video_path.parent / f"{video_path.stem}_frames")
+        out_var = tk.StringVar(value=default_out)
+        ttk.Entry(f4, textvariable=out_var, width=30).pack(side="left", padx=4, fill="x", expand=True)
+        ttk.Button(f4, text="…", width=3,
+                    command=lambda: out_var.set(
+                        filedialog.askdirectory(initialdir=video_path.parent) or out_var.get()
+                    )).pack(side="left")
+
+        # OK / Cancel
+        btns = ttk.Frame(dialog); btns.pack(fill="x", padx=12, pady=12)
+        def on_ok():
+            result["ok"] = True
+            dialog.destroy()
+        def on_cancel():
+            dialog.destroy()
+        ttk.Button(btns, text="Загрузить", command=on_ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Отмена", command=on_cancel).pack(side="right")
+
+        self.root.wait_window(dialog)
+
+        if not result["ok"]:
+            return None
+        return (
+            max(1, every_var.get()),
+            max(1, max_var.get()),
+            max(0, start_var.get()),
+            Path(out_var.get()),
+        )
+
+    # ── Pack spritesheet ─────────────────────────────────────────────────────
+
+    def _open_pack_dialog(self):
+        """Диалог упаковки видимых слоёв в один спрайт-лист."""
+        if not self.layers:
+            messagebox.showinfo("Нечего паковать", "Сначала загрузи слои.")
+            return
+
+        visible_layers = [l for l in self.layers.values() if l.visible]
+        if not visible_layers:
+            messagebox.showwarning("Нет видимых слоёв",
+                "Все слои скрыты. В спрайт идут только видимые (галочка).")
+            return
+
+        # Авто-подбор сетки
+        n = len(visible_layers)
+        suggest_cols = 4 if n > 4 else n
+        suggest_rows = (n + suggest_cols - 1) // suggest_cols
+
+        # Размер клетки — берём из активного слоя
+        active = self._active()
+        if active:
+            cell_suggest = max(active.current.size)
+        else:
+            cell_suggest = 96
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title("Упаковка в спрайт-лист")
+        dialog.configure(bg=DARK["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.geometry("440x330")
+
+        result = {"ok": False}
+
+        ttk.Label(dialog,
+            text=f"Видимых слоёв: {n} (только видимые попадут в спрайт)",
+            justify="left").pack(anchor="w", padx=12, pady=(10, 8))
+
+        def row(parent, label):
+            f = ttk.Frame(parent); f.pack(fill="x", padx=12, pady=3)
+            ttk.Label(f, text=label, width=22).pack(side="left")
+            return f
+
+        f = row(dialog, "Размер клетки (Ш × В):")
+        cw_var = tk.IntVar(value=cell_suggest)
+        ch_var = tk.IntVar(value=cell_suggest)
+        ttk.Spinbox(f, from_=8, to=512, width=6, textvariable=cw_var).pack(side="left")
+        ttk.Label(f, text=" × ").pack(side="left")
+        ttk.Spinbox(f, from_=8, to=512, width=6, textvariable=ch_var).pack(side="left")
+
+        f = row(dialog, "Сетка (cols × rows):")
+        cols_var = tk.IntVar(value=suggest_cols)
+        rows_var = tk.IntVar(value=suggest_rows)
+        ttk.Spinbox(f, from_=1, to=20, width=6, textvariable=cols_var).pack(side="left")
+        ttk.Label(f, text=" × ").pack(side="left")
+        ttk.Spinbox(f, from_=1, to=20, width=6, textvariable=rows_var).pack(side="left")
+
+        f = row(dialog, "Action (для манифеста):")
+        action_var = tk.StringVar(value="walk")
+        ttk.Combobox(f, textvariable=action_var, width=14,
+                      values=["idle", "walk", "attack", "hurt", "jump", "death"]
+                      ).pack(side="left")
+
+        f = row(dialog, "Direction:")
+        dir_var = tk.StringVar(value="s")
+        ttk.Combobox(f, textvariable=dir_var, width=14,
+                      values=["s", "n", "e", "w", "ne", "nw", "se", "sw"]
+                      ).pack(side="left")
+
+        f = row(dialog, "FPS:")
+        fps_var = tk.IntVar(value=10)
+        ttk.Spinbox(f, from_=1, to=60, width=6, textvariable=fps_var).pack(side="left")
+
+        f = row(dialog, "Папка для вывода:")
+        if self.folder:
+            default_out = str(self.folder / "_spritesheet")
+        else:
+            default_out = ""
+        out_var = tk.StringVar(value=default_out)
+        ttk.Entry(f, textvariable=out_var, width=20).pack(side="left", padx=2, fill="x", expand=True)
+        ttk.Button(f, text="…", width=3,
+                    command=lambda: out_var.set(filedialog.askdirectory() or out_var.get())
+                    ).pack(side="left")
+
+        btns = ttk.Frame(dialog); btns.pack(fill="x", padx=12, pady=12)
+        def on_ok():
+            result["ok"] = True
+            dialog.destroy()
+        ttk.Button(btns, text="Pack", command=on_ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Отмена", command=dialog.destroy).pack(side="right")
+
+        self.root.wait_window(dialog)
+        if not result["ok"]:
+            return
+
+        out_path = Path(out_var.get())
+        if not str(out_path):
+            messagebox.showerror("Ошибка", "Не указана папка вывода.")
+            return
+
+        # Сборка кадров с учётом offset (чтобы правки в редакторе применились)
+        prepared = []
+        for layer in visible_layers:
+            w, h = layer.current.size
+            composite = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            composite.paste(layer.current, (layer.offset_x, layer.offset_y), layer.current)
+            prepared.append(composite)
+
+        cell_w = max(8, int(cw_var.get()))
+        cell_h = max(8, int(ch_var.get()))
+        cols = max(1, int(cols_var.get()))
+        rows = max(1, int(rows_var.get()))
+
+        sheet = ss_mod.pack_spritesheet(prepared, cell_w, cell_h, cols, rows)
+        manifest = ss_mod.build_manifest(
+            action=action_var.get(),
+            direction=dir_var.get(),
+            frame_count=min(len(prepared), cols * rows),
+            cell_w=cell_w, cell_h=cell_h,
+            cols=cols, rows=rows,
+            fps=int(fps_var.get()),
+        )
+
+        png_path, json_path = ss_mod.save_spritesheet(sheet, manifest, out_path)
+        self.status.config(text=f"✓ Spritesheet: {png_path}")
+        messagebox.showinfo("Готово",
+            f"Спрайт-лист сохранён:\n\n"
+            f"  {png_path}\n  {json_path}\n\n"
+            f"Кадров: {min(len(prepared), cols * rows)} в сетке {cols}×{rows}\n"
+            f"Размер клетки: {cell_w}×{cell_h}"
+        )
+
+    # ── Save (folder mode) ───────────────────────────────────────────────────
+
     def _save_active(self):
         if not self.active_name:
             return
@@ -698,7 +1012,7 @@ class SpriteEditor:
 
     def _save_layer(self, layer: SpriteLayer) -> Path:
         out_dir = self.folder / OUTPUT_SUBFOLDER
-        out_dir.mkdir(exist_ok=True)
+        out_dir.mkdir(parents=True, exist_ok=True)
         # Применить offset к итоговому изображению: сдвигаем содержимое внутри холста
         w, h = layer.current.size
         composite = Image.new("RGBA", (w, h), (0, 0, 0, 0))
@@ -710,25 +1024,25 @@ class SpriteEditor:
     # ── File list panel ──────────────────────────────────────────────────────
 
     def _rebuild_file_list(self):
+        """Полная перестройка — только при загрузке/смене набора слоёв."""
         for w in self.file_list_frame.winfo_children():
             w.destroy()
+        # Запоминаем виджеты для инкрементальных апдейтов
+        self._file_rows: dict[str, dict] = {}
 
         for name, layer in self.layers.items():
             row = ttk.Frame(self.file_list_frame)
             row.pack(fill="x", padx=2, pady=1)
 
-            # Visibility checkbox
             vis_var = tk.BooleanVar(value=layer.visible)
             cb = ttk.Checkbutton(row, variable=vis_var,
                                   command=lambda n=name, v=vis_var: self._toggle_visible(n, v))
             cb.pack(side="left")
 
-            # Color swatch
             swatch = tk.Label(row, text=" ", bg=layer.tint_color,
                               relief="solid", borderwidth=1, width=2)
             swatch.pack(side="left", padx=2)
 
-            # Active selector + name
             is_active = (name == self.active_name)
             btn = tk.Button(
                 row, text=name, anchor="w",
@@ -741,13 +1055,53 @@ class SpriteEditor:
             )
             btn.pack(side="left", fill="x", expand=True, padx=2)
 
+            self._file_rows[name] = {"row": row, "btn": btn, "swatch": swatch, "vis": vis_var}
+
+    def _update_file_list_active(self, prev_name: Optional[str]):
+        """
+        Быстрый апдейт: перекрасить только две строки (старый + новый активный).
+        Не пересоздаёт виджеты — критично при 100+ кадрах.
+        """
+        if not hasattr(self, "_file_rows"):
+            return
+        for n in (prev_name, self.active_name):
+            if n and n in self._file_rows:
+                is_active = (n == self.active_name)
+                self._file_rows[n]["btn"].config(
+                    bg=(DARK["list_active"] if is_active else DARK["list_inactive"]),
+                    fg=(DARK["fg_active"] if is_active else DARK["fg"]),
+                )
+
+    def _update_file_list_swatch(self, name: str):
+        """Обновить цветной квадратик у одного слоя."""
+        if hasattr(self, "_file_rows") and name in self._file_rows:
+            self._file_rows[name]["swatch"].config(bg=self.layers[name].tint_color)
+
     def _toggle_visible(self, name: str, var: tk.BooleanVar):
-        self.layers[name].visible = var.get()
+        layer = self.layers[name]
+        layer.visible = var.get()
+        # Освобождаем кэш скрытого слоя — иначе при 100+ кадрах быстро OOM
+        if not layer.visible:
+            layer._tinted_cache = None
+            layer._tint_key = None
+            layer.invalidate_cache()
+        # Если в плейбэке — замкнуть индекс по новому числу видимых
+        if self.playback_on:
+            visible = self._visible_layers_ordered()
+            if not visible:
+                self._exit_playback()
+                return
+            self.playback_idx %= len(visible)
+        self._update_frame_indicator()
         self._redraw()
 
     def _set_active(self, name: str):
+        if self.playback_on:
+            self._exit_playback()
+        prev = self.active_name
         self.active_name = name
-        self._rebuild_file_list()
+        # Не пересоздаём всю панель — только перекрасим две строки
+        self._update_file_list_active(prev)
         self._update_active_panel()
         self._redraw()
 
@@ -862,11 +1216,12 @@ class SpriteEditor:
         self.canvas.yview_moveto(0)
 
     def _redraw(self):
-        """Полная перерисовка. Использует кэш PhotoImage у каждого слоя."""
+        """Полная перерисовка. Использует двухуровневый кэш у каждого слоя."""
         self.canvas.delete("all")
-        # Канвас-айди слоёв сбрасываются после delete("all")
         for layer in self.layers.values():
             layer._canvas_item = None
+        # delete("all") инвалидировал и playback item
+        self._playback_item = None
 
         if not self.layers:
             return
@@ -881,17 +1236,30 @@ class SpriteEditor:
         self.canvas.create_rectangle(0, 0, view_w, view_h,
                                       fill=DARK["canvas_bg"], outline="")
 
-        # Порядок отрисовки: сначала все НЕактивные как силуэты,
-        # потом активный поверх всех с реальными цветами
-        draw_order = [
-            (name, layer) for name, layer in self.layers.items()
-            if layer.visible and name != self.active_name
-        ]
-        if self.active_name and self.layers[self.active_name].visible:
-            draw_order.append((self.active_name, self.layers[self.active_name]))
+        # Режим плеера — показываем только один кадр с реальными цветами
+        if self.playback_on:
+            visible = self._visible_layers_ordered()
+            if visible:
+                idx = self.playback_idx % len(visible)
+                current = visible[idx]
+                # Найти имя слоя
+                name = next(n for n, l in self.layers.items() if l is current)
+                draw_order = [(name, current)]
+            else:
+                draw_order = []
+        else:
+            # Обычный overlay-режим: неактивные силуэтами, активный сверху
+            draw_order = [
+                (name, layer) for name, layer in self.layers.items()
+                if layer.visible and name != self.active_name
+            ]
+            if self.active_name and self.layers[self.active_name].visible:
+                draw_order.append((self.active_name, self.layers[self.active_name]))
 
         for name, layer in draw_order:
-            is_active = (name == self.active_name)
+            # В плейбэке единственный отрисовываемый кадр всегда «активный»
+            # (реальные цвета, полная непрозрачность).
+            is_active = self.playback_on or (name == self.active_name)
 
             if is_active:
                 # Реальные цвета, без тинта, полная непрозрачность
@@ -926,6 +1294,10 @@ class SpriteEditor:
                 anchor="nw",
                 image=layer._cached_photo,
             )
+            # В плейбэке отрисовывается ровно один кадр — запоминаем его item
+            # для последующих fast-path обновлений
+            if self.playback_on:
+                self._playback_item = layer._canvas_item
 
         # Overlays
         if self.show_baseline.get():
@@ -959,6 +1331,132 @@ class SpriteEditor:
                     int(layer.offset_x * scale),
                     int(layer.offset_y * scale),
                 )
+
+    # ── Playback (превью анимации) ───────────────────────────────────────────
+
+    def _visible_layers_ordered(self) -> list:
+        """Список видимых слоёв в порядке отрисовки (= порядок в dict)."""
+        return [l for l in self.layers.values() if l.visible]
+
+    def _toggle_playback(self):
+        """Play ↔ Pause. Если ещё не в режиме плеера — запустить."""
+        visible = self._visible_layers_ordered()
+        if len(visible) < 2:
+            self.status.config(text="Для превью нужно ≥ 2 видимых кадра")
+            return
+
+        if self.playback_after_id is not None:
+            # Сейчас играет — на паузу
+            self._stop_timer()
+            self.play_btn.config(text="▶ Play")
+            self.status.config(text=f"Пауза на кадре {self.playback_idx + 1}/{len(visible)}")
+        else:
+            # Запустить (или возобновить)
+            first_entry = not self.playback_on
+            self.playback_on = True
+            self.play_btn.config(text="⏸ Pause")
+            self._update_frame_indicator()
+            if first_entry:
+                # Чистим canvas от overlay-вида, создаём один shared playback item
+                self._redraw()
+            else:
+                # Просто возобновили паузу — ничего не дёргаем
+                pass
+            self._schedule_next_tick()
+            self.status.config(text="▶ Воспроизведение")
+
+    def _schedule_next_tick(self):
+        fps = max(1, int(self.play_fps.get()))
+        delay_ms = max(16, int(1000 / fps))
+        self.playback_after_id = self.root.after(delay_ms, self._play_tick)
+
+    def _play_tick(self):
+        """Один такт таймера — следующий кадр (fast path, без delete('all'))."""
+        visible = self._visible_layers_ordered()
+        if not visible:
+            self._stop_timer()
+            self.playback_on = False
+            return
+        self.playback_idx = (self.playback_idx + 1) % len(visible)
+        self._update_frame_indicator()
+        self._fast_playback_redraw()
+        self._schedule_next_tick()
+
+    def _fast_playback_redraw(self):
+        """
+        Hot path плейбэка: только подменяет image у одного canvas item.
+        НЕ дёргает delete('all'), не пересоздаёт chrome (baseline, центр).
+        """
+        visible = self._visible_layers_ordered()
+        if not visible:
+            return
+        layer = visible[self.playback_idx % len(visible)]
+
+        # Убедиться что фотка готова под текущий scale в режиме real-color
+        scale = self.view_scale
+        cache_key = (scale, "real", id(layer.current))
+        if layer._cache_key != cache_key:
+            tint_key = ("real", id(layer.current))
+            if getattr(layer, "_tint_key", None) != tint_key:
+                layer._tinted_cache = layer.current.convert("RGBA")
+                layer._tint_key = tint_key
+            tinted = layer._tinted_cache
+            tw = max(1, int(tinted.size[0] * scale))
+            th = max(1, int(tinted.size[1] * scale))
+            scaled = tinted.resize((tw, th), Image.NEAREST)
+            layer._cached_photo = ImageTk.PhotoImage(scaled)
+            layer._cache_key = cache_key
+
+        x = int(layer.offset_x * scale)
+        y = int(layer.offset_y * scale)
+
+        if self._playback_item is None:
+            # Первый такт после старта плейбэка — создаём item
+            self._playback_item = self.canvas.create_image(
+                x, y, anchor="nw", image=layer._cached_photo
+            )
+        else:
+            self.canvas.itemconfigure(self._playback_item, image=layer._cached_photo)
+            self.canvas.coords(self._playback_item, x, y)
+
+    def _stop_timer(self):
+        if self.playback_after_id is not None:
+            self.root.after_cancel(self.playback_after_id)
+            self.playback_after_id = None
+
+    def _scrub(self, target_idx: int):
+        """Прыжок на конкретный кадр."""
+        visible = self._visible_layers_ordered()
+        if not visible:
+            return
+        self._stop_timer()
+        self.play_btn.config(text="▶ Play")
+        first_entry = not self.playback_on
+        self.playback_on = True
+        self.playback_idx = target_idx % len(visible)
+        self._update_frame_indicator()
+        if first_entry:
+            self._redraw()      # переход overlay → playback (один раз)
+        else:
+            self._fast_playback_redraw()
+        self.status.config(text=f"Кадр {self.playback_idx + 1}/{len(visible)}")
+
+    def _exit_playback(self):
+        """Выйти из режима превью обратно к overlay-виду."""
+        if not self.playback_on:
+            return
+        self._stop_timer()
+        self.playback_on = False
+        self.play_btn.config(text="▶ Play")
+        self._update_frame_indicator()
+        self._redraw()
+
+    def _update_frame_indicator(self):
+        total = len(self._visible_layers_ordered())
+        if self.playback_on and total > 0:
+            self.frame_indicator.config(text=f"{self.playback_idx + 1} / {total}")
+        else:
+            self.frame_indicator.config(text=f"– / {total}")
 
     def _apply_tint(self, img: Image.Image, hex_color: str, alpha: int = 255) -> Image.Image:
         """Умножает RGB на цвет тинта (сохраняет затенения)."""

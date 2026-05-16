@@ -10,6 +10,8 @@ class_name EnemyData
 @export var attack_damage: int = 8
 @export var attack_range: float = 1.5
 @export var attack_cooldown: float = 1.5
+## Снижает входящий урон от игрока. Итоговый урон: max(1, damage - defense).
+@export var defense: int = 0
 
 @export_group("Movement")
 @export var move_speed: float = 2.5
