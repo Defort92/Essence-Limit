@@ -101,3 +101,13 @@ func deserialize(data: Array) -> void:
 			if item:
 				_slots.append({ "item": item, "quantity": entry.get("quantity", 1) })
 	inventory_changed.emit()
+
+## Использует один расходник [param item_id] на [param target].
+## Применяет эффект через ConsumableData.apply() и удаляет 1 единицу из стека.
+## Возвращает [code]false[/code] если предмет не найден или он не является расходником.
+func use_consumable(item_id: String, target: Node) -> bool:
+	for slot in _slots:
+		if slot.item.id == item_id and slot.item is ConsumableData:
+			(slot.item as ConsumableData).apply(target)
+			return remove_item(item_id, 1)
+	return false

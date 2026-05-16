@@ -29,6 +29,13 @@
 | EquipmentManager | `scripts/systems/equipment_manager.gd` | ✅ надевание/снятие снаряжения |
 | SaveSystem | `scripts/systems/save_system.gd` | ✅ JSON, 3 слота сохранения |
 | PauseManager | `scripts/systems/pause_manager.gd` | ✅ пауза / сигналы |
+| AbilityManager | `scripts/systems/ability_manager.gd` | ✅ спавн/удаление способностей эссенций |
+| RacialPassiveSystem | `scripts/systems/racial_passive_system.gd` | ✅ расовые пассивки |
+| AchievementSystem | `scripts/systems/achievement_system.gd` | ✅ достижения + награды |
+| AuraComponent | `scripts/components/aura_component.gd` | ✅ пассивный эффект в радиусе |
+| AbilityBase | `scripts/entities/ability_base.gd` | ✅ базовый класс способности |
+| BossBase | `scripts/entities/boss_base.gd` | ✅ враг с фазами |
+| AchievementData | `scripts/data/achievement_data.gd` | ✅ Resource-класс |
 | Player | `scripts/entities/player.gd` | ✅ движение, dodge, HP, статы |
 | Enemy | `scripts/entities/enemy.gd` | ✅ AI, модификаторы, лут-сигнал |
 | ItemPickup | `scripts/entities/item_pickup.gd` | ✅ автоподбор через Area3D |
@@ -59,6 +66,9 @@
 | InventorySystem | `scripts/systems/inventory_system.gd` |
 | StashSystem | `scripts/systems/stash_system.gd` |
 | EquipmentManager | `scripts/systems/equipment_manager.gd` |
+| AbilityManager | `scripts/systems/ability_manager.gd` |
+| RacialPassiveSystem | `scripts/systems/racial_passive_system.gd` |
+| AchievementSystem | `scripts/systems/achievement_system.gd` |
 | SaveSystem | `scripts/systems/save_system.gd` |
 | PauseManager | `scripts/systems/pause_manager.gd` |
 
@@ -73,7 +83,17 @@
 | `move_up` | W |
 | `move_down` | S |
 | `dodge` | Space |
+| `attack` | ЛКМ (Mouse Button Left) |
+| `block` | ПКМ (Mouse Button Right) |
 | `pause` | Escape |
+| `ability_1` | Q |
+| `ability_2` | E |
+| `ability_3` | R |
+| `ability_4` | F |
+| `consumable_1` | 1 |
+| `consumable_2` | 2 |
+| `consumable_3` | 3 |
+| `consumable_4` | 4 |
 
 ---
 

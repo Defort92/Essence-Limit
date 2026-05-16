@@ -24,6 +24,7 @@ signal health_changed(current: int, maximum: int)
 signal loot_dropped(items: Array, gold: int, at_position: Vector3)
 
 func _ready() -> void:
+	add_to_group("enemies")
 	if data == null:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
 		return

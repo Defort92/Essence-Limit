@@ -32,6 +32,8 @@ func save(slot: int) -> void:
 		"inventory": InventorySystem.serialize(),
 		"stash": StashSystem.serialize(),
 		"equipment": EquipmentManager.serialize(),
+		"racial_passives": RacialPassiveSystem.serialize(),
+		"achievements": AchievementSystem.serialize(),
 	}
 
 	var file := FileAccess.open(SAVE_DIR + "slot_%d.json" % slot, FileAccess.WRITE)
@@ -72,7 +74,7 @@ func delete_save(slot: int) -> void:
 	if FileAccess.file_exists(file_path):
 		DirAccess.remove_absolute(file_path)
 
-## Возвращает краткую информацию о сохранении для превью на экране выбора слота.
+## Возвращает краткую информацию о сохранении для превью экрана выбора.
 ## Ключи: player_name, race, level, gold. Пустой словарь если слот пуст.
 func get_save_info(slot: int) -> Dictionary:
 	if not has_save(slot):
@@ -112,26 +114,31 @@ func _apply_save(save_data: Dictionary) -> void:
 	InventorySystem.deserialize(save_data.get("inventory", []))
 	StashSystem.deserialize(save_data.get("stash", []))
 	EquipmentManager.deserialize(save_data.get("equipment", {}))
+	RacialPassiveSystem.deserialize(save_data.get("racial_passives", []))
+	AchievementSystem.deserialize(save_data.get("achievements", {}))
+
+	# AbilityManager перестраивает способности после загрузки эссенций.
+	AbilityManager.rebuild_from_slots()
 
 	# Player._init_race_stats() читает это значение при старте, если оно > 0.
 	GameManager.saved_health = player_data.get("health", -1)
 
 func _get_player_health() -> int:
 	var player := _find_player()
-	if player and "health" in player:
+	if player != null and "health" in player:
 		return player.health
 	return -1
 
 func _serialize_essences() -> Array:
 	var result := []
 	for essence in EssenceSystem.slots:
-		result.append(essence.resource_path if essence else null)
+		result.append(essence.resource_path if essence != null else null)
 	return result
 
 func _deserialize_essences(data: Array) -> void:
 	for idx in range(min(data.size(), EssenceSystem.slots.size())):
 		var res_path = data[idx]
-		if res_path and ResourceLoader.exists(res_path):
+		if res_path != null and ResourceLoader.exists(res_path):
 			EssenceSystem.slots[idx] = load(res_path) as EssenceData
 		else:
 			EssenceSystem.slots[idx] = null
