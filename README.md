@@ -31,7 +31,8 @@
 | PauseManager | `scripts/systems/pause_manager.gd` | ✅ пауза / сигналы |
 | AbilityManager | `scripts/systems/ability_manager.gd` | ✅ спавн/удаление способностей эссенций |
 | RacialPassiveSystem | `scripts/systems/racial_passive_system.gd` | ✅ расовые пассивки |
-| AchievementSystem | `scripts/systems/achievement_system.gd` | ✅ достижения + награды |
+| AchievementSystem | `scripts/systems/achievement_system.gd` | ✅ достижения + накопленные награды (persistent) |
+| SceneManager | `scripts/systems/scene_manager.gd` | ✅ смена сцен |
 | AuraComponent | `scripts/components/aura_component.gd` | ✅ пассивный эффект в радиусе |
 | AbilityBase | `scripts/entities/ability_base.gd` | ✅ базовый класс способности |
 | BossBase | `scripts/entities/boss_base.gd` | ✅ враг с фазами |
@@ -69,6 +70,7 @@
 | AbilityManager | `scripts/systems/ability_manager.gd` |
 | RacialPassiveSystem | `scripts/systems/racial_passive_system.gd` |
 | AchievementSystem | `scripts/systems/achievement_system.gd` |
+| SceneManager | `scripts/systems/scene_manager.gd` |
 | SaveSystem | `scripts/systems/save_system.gd` |
 | PauseManager | `scripts/systems/pause_manager.gd` |
 

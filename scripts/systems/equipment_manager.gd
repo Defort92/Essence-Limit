@@ -14,7 +14,19 @@ signal item_equipped(slot: int, item: EquipmentData)
 signal item_unequipped(slot: int, item: EquipmentData)
 signal equipment_changed()
 
-## Надевает [param item] из рюкзака.
+## Надевает [param item], предварительно удаляя его из рюкзака.
+## Используй этот метод из UI — он атомарно делает remove из инвентаря и equip.
+## Возвращает [code]false[/code] если предмета нет в рюкзаке или аксессуарный список полон.
+func equip_from_inventory(item: EquipmentData) -> bool:
+	if not InventorySystem.has_item(item.id):
+		return false
+	if not equip(item):
+		return false
+	InventorySystem.remove_item(item.id, 1)
+	return true
+
+## Надевает [param item] напрямую (без удаления из рюкзака).
+## Используй equip_from_inventory() из UI; этот метод — для внутренней логики и загрузки.
 ## Двуручное оружие автоматически снимает предмет со слота WEAPON_OFF.
 ## Возвращает [code]false[/code] если аксессуарный список заполнен.
 func equip(item: EquipmentData) -> bool:
@@ -83,7 +95,7 @@ func get_total_stat(stat: String) -> int:
 			total += item.stat_bonuses[stat]
 	return total
 
-## Снимает всё снаряжение без возврата в рюкзак (например, при смерти или создании нового персонажа).
+## Снимает всё снаряжение без возврата в рюкзак (например, при создании нового персонажа).
 func clear() -> void:
 	_equipped.clear()
 	_accessories.clear()
@@ -118,7 +130,6 @@ func deserialize(data: Dictionary) -> void:
 	equipment_changed.emit()
 
 # Снимает предмет из слота и кладёт в рюкзак без эмита equipment_changed.
-# Используется внутри equip() чтобы освободить слот перед надеванием нового предмета.
 func _displace_slot(slot: EquipmentData.Slot) -> void:
 	if not _equipped.has(slot):
 		return

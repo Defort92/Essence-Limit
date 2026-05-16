@@ -26,7 +26,19 @@ func add_bonus_slot() -> void:
 	slots.resize(slots.size() + 1)
 	slots_changed.emit()
 
-## Вставляет [param essence] в первый свободный слот.
+## Вставляет [param essence] из рюкзака в первый свободный слот.
+## Атомарно удаляет из инвентаря и устанавливает в слот.
+## Используй этот метод из UI. Возвращает [code]false[/code] если предмета нет или нет слотов.
+func equip_from_inventory(essence: EssenceData) -> bool:
+	if not InventorySystem.has_item(essence.id):
+		return false
+	if not equip(essence):
+		return false
+	InventorySystem.remove_item(essence.id, 1)
+	return true
+
+## Вставляет [param essence] напрямую (без удаления из рюкзака).
+## Используй equip_from_inventory() из UI; этот метод — для внутренней логики и загрузки.
 ## Возвращает [code]false[/code] если все слоты заняты.
 func equip(essence: EssenceData) -> bool:
 	for idx in slots.size():

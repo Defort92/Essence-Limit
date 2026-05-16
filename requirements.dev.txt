@@ -1,0 +1,7 @@
+# Essence Limit — Python tooling dependencies
+# Install with: pip install -r requirements.txt
+
+black
+pylint
+isort
+flake8

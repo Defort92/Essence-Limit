@@ -290,7 +290,7 @@ VIDEO_TEMPLATE = """\
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ⚠ ATTACH the processed directional anchor PNG ({dir_key}) as the reference image before sending.
 
-Generate a 6-second image-to-video clip from the attached anchor image.
+Generate a 6-second loop image-to-video clip from the attached anchor image. Videos starts with attached image and must end with the same image
 
 ── SUBJECT ────────────────────────────────────
 Same character as the input image. {dir_name}-facing ({dir_desc}).

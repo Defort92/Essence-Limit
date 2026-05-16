@@ -21,6 +21,7 @@ func save(slot: int) -> void:
 			"player_name": GameManager.player_name,
 			"gold": GameManager.gold,
 			"health": _get_player_health(),
+			"quick_slots": _get_player_quick_slots(),
 		},
 		"xp": {
 			"current_xp": XPSystem.current_xp,
@@ -74,7 +75,7 @@ func delete_save(slot: int) -> void:
 	if FileAccess.file_exists(file_path):
 		DirAccess.remove_absolute(file_path)
 
-## Возвращает краткую информацию о сохранении для превью экрана выбора.
+## Возвращает краткую информацию о сохранении для превью экрана выбора слотов.
 ## Ключи: player_name, race, level, gold. Пустой словарь если слот пуст.
 func get_save_info(slot: int) -> Dictionary:
 	if not has_save(slot):
@@ -117,17 +118,24 @@ func _apply_save(save_data: Dictionary) -> void:
 	RacialPassiveSystem.deserialize(save_data.get("racial_passives", []))
 	AchievementSystem.deserialize(save_data.get("achievements", {}))
 
-	# AbilityManager перестраивает способности после загрузки эссенций.
 	AbilityManager.rebuild_from_slots()
 
-	# Player._init_race_stats() читает это значение при старте, если оно > 0.
+	# Player._init_race_stats() читает эти значения при старте сцены.
 	GameManager.saved_health = player_data.get("health", -1)
+	var raw_slots = player_data.get("quick_slots", ["", "", "", ""])
+	GameManager.saved_quick_slots = raw_slots if raw_slots is Array else ["", "", "", ""]
 
 func _get_player_health() -> int:
 	var player := _find_player()
 	if player != null and "health" in player:
 		return player.health
 	return -1
+
+func _get_player_quick_slots() -> Array:
+	var player := _find_player()
+	if player != null and "quick_slots" in player:
+		return player.quick_slots.duplicate()
+	return ["", "", "", ""]
 
 func _serialize_essences() -> Array:
 	var result := []
