@@ -5,17 +5,19 @@
 extends Node
 
 const MAX_LEVEL := 100
+const MIN_LEVEL := 1
 
 var current_xp: int = 0
 var current_level: int = 1
 
-## Словарь mob_type_id → true. Хранится на всё время жизни персонажа, не сбрасывается на каждом забеге.
+## Словарь mob_type_id → true. Хранится на всё время жизни персонажа.
 var killed_mob_types: Dictionary = {}
-## Словарь floor_id → true. Сбрасывается при каждом новом забеге через on_run_started().
+## Словарь floor_id → true. Сбрасывается при каждом новом забеге.
 var bosses_killed_this_run: Dictionary = {}
 
 signal xp_gained(amount: int, total: int)
 signal level_up(new_level: int)
+signal level_down(new_level: int)
 
 ## Начисляет XP за убийство моба [param mob_type_id], если этот тип ещё не был убит.
 func try_award_kill_xp(mob_type_id: String, xp_reward: int) -> void:
@@ -34,6 +36,28 @@ func try_award_boss_kill_xp(floor_id: int, xp_reward: int) -> void:
 		return
 	bosses_killed_this_run[floor_id] = true
 	_add_xp(xp_reward)
+
+## Временно снижает уровень на [param amount] (способность монстра, аура этажа).
+## Сохраняет XP нетронутым — при снятии эффекта уровень восстанавливается через restore_level().
+## Слоты эссенций блокируются, но не уничтожаются.
+func reduce_level(amount: int) -> void:
+	var new_level := max(MIN_LEVEL, current_level - amount)
+	if new_level == current_level:
+		return
+	current_level = new_level
+	EssenceSystem.resize_to_level(current_level)
+	level_down.emit(current_level)
+
+## Восстанавливает уровень после временного снижения.
+## Пересчитывает фактический уровень по накопленному XP — никаких дублей слотов не будет,
+## потому что EssenceSystem.resize_to_level не создаёт лишних слотов если они уже есть.
+func restore_level() -> void:
+	var correct_level := _calculate_level_from_xp()
+	if correct_level == current_level:
+		return
+	current_level = correct_level
+	EssenceSystem.resize_to_level(current_level)
+	level_up.emit(current_level)
 
 ## Сбрасывает счётчик убийств боссов. Вызывать при каждом открытии портала.
 func on_run_started() -> void:
@@ -57,6 +81,13 @@ func _check_level_up() -> void:
 		current_level += 1
 		EssenceSystem.resize_to_level(current_level)
 		level_up.emit(current_level)
+
+## Вычисляет фактический уровень по накопленному XP без изменения состояния.
+func _calculate_level_from_xp() -> int:
+	var level := MIN_LEVEL
+	while level < MAX_LEVEL and current_xp >= _xp_for_level(level + 1):
+		level += 1
+	return level
 
 func _xp_for_level(level: int) -> int:
 	return level * level * 100

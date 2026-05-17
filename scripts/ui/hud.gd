@@ -15,8 +15,20 @@ func _ready() -> void:
 func _connect_player() -> void:
 	var players := get_tree().get_nodes_in_group("player")
 	if players.is_empty():
+		# Player ещё не добавлен в сцену — ждём через scene tree signal.
+		get_tree().node_added.connect(_on_node_added_to_tree)
 		return
-	var player: Player = players[0]
+	_subscribe_to_player(players[0] as Player)
+
+func _on_node_added_to_tree(node: Node) -> void:
+	if not node.is_in_group("player"):
+		return
+	get_tree().node_added.disconnect(_on_node_added_to_tree)
+	_subscribe_to_player(node as Player)
+
+func _subscribe_to_player(player: Player) -> void:
+	if player == null:
+		return
 	player.health_changed.connect(_on_health_changed)
 	_on_health_changed(player.health, player.max_health)
 

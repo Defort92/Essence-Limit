@@ -1,8 +1,12 @@
 # Essence Limit — Python tooling dependencies
 # Install with: pip install -r requirements.txt
 
-Pillow>=10.0.0    # image processing (process_anchor, build_spritesheet, sprite_editor)
-numpy>=1.24.0     # array ops for chroma key, foot-baseline detection, tint blending
+Pillow>=10.0.0          # image processing (process_anchor, build_spritesheet, sprite_editor)
+numpy>=1.24.0           # array ops for chroma key, foot-baseline, paint brush, smart-snap vectorization
+
+# Video → frames loader (sprite_editor: I2V walk-cycle import)
+imageio>=2.31.0         # video decoding API
+imageio-ffmpeg>=0.4.9   # ffmpeg backend for imageio (mp4/webm/mov/avi/mkv)
 
 # Note: tkinter is used by sprite_editor but ships with Python on Windows —
 # no separate install needed.

@@ -120,6 +120,9 @@ func _apply_save(save_data: Dictionary) -> void:
 
 	AbilityManager.rebuild_from_slots()
 
+	# Пересчитать уровень на случай несогласованных данных в сохранении.
+	XPSystem._check_level_up()
+
 	# Player._init_race_stats() читает эти значения при старте сцены.
 	GameManager.saved_health = player_data.get("health", -1)
 	var raw_slots = player_data.get("quick_slots", ["", "", "", ""])

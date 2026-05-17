@@ -28,7 +28,11 @@ func _ready() -> void:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
 		return
 	health = get_stat_int("max_health")
+	# Ищем Player в следующем кадре, чтобы он успел добавиться в группу.
+	# Проверяем is_inside_tree() перед доступом — на случай если Enemy удалён до этого кадра.
 	await get_tree().process_frame
+	if not is_inside_tree():
+		return
 	_player = get_tree().get_first_node_in_group("player") as Player
 
 func _physics_process(delta: float) -> void:
@@ -154,3 +158,27 @@ func _on_attack(player: Player) -> void:
 ## Переопределяй для эффектов при смерти (анимация, спавн сущностей).
 func _on_die() -> void:
 	pass
+
+# ─── Утилиты поломки снаряжения ────────────────────────────────────────────
+
+## Ломает случайный надетый предмет у [param player].
+## Вызывай из _on_attack() боссов или уникальных мобов с особой атакой.
+## Если всё снаряжение уже сломано или не надето — ничего не происходит.
+func _break_random_equipment(player: Player) -> void:
+	# Собираем список незломанных слотов + аксессуаров.
+	var targets: Array = []
+	for slot in EquipmentData.Slot.values():
+		if slot == EquipmentData.Slot.ACCESSORY:
+			continue
+		if EquipmentManager.get_equipped(slot) != null and not EquipmentManager.is_slot_broken(slot):
+			targets.append({"type": "slot", "key": slot})
+	for idx in EquipmentManager.get_accessories().size():
+		if not EquipmentManager.is_accessory_broken(idx):
+			targets.append({"type": "acc", "key": idx})
+	if targets.is_empty():
+		return
+	var chosen: Dictionary = targets[randi() % targets.size()]
+	if chosen.type == "slot":
+		EquipmentManager.break_equipped_item(chosen.key)
+	else:
+		EquipmentManager.break_accessory(chosen.key)

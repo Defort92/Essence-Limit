@@ -18,6 +18,11 @@ var bindings: Dictionary = DEFAULT_BINDINGS.duplicate()
 ## Словарь: slot_index (int) → AbilityBase.
 var _active_abilities: Dictionary = {}
 
+## Количество попыток найти Player перед отказом от спавна.
+const MAX_SPAWN_RETRIES: int = 10
+## slot_index → счётчик попыток.
+var _spawn_retries: Dictionary = {}
+
 signal ability_added(slot_index: int, ability: AbilityBase)
 signal ability_removed(slot_index: int)
 signal ability_activated(slot_index: int)
@@ -77,9 +82,16 @@ func _on_essence_removed(slot_index: int) -> void:
 func _spawn_ability(slot_index: int, essence: EssenceData) -> void:
 	var player := _find_player()
 	if player == null:
-		# Player ещё не в дереве — отложить до следующего кадра.
+		var retries: int = _spawn_retries.get(slot_index, 0)
+		if retries >= MAX_SPAWN_RETRIES:
+			push_warning("AbilityManager: Player не найден за %d попыток, спавн способности отменён (slot %d)" % [MAX_SPAWN_RETRIES, slot_index])
+			_spawn_retries.erase(slot_index)
+			return
+		_spawn_retries[slot_index] = retries + 1
 		call_deferred("_spawn_ability", slot_index, essence)
 		return
+
+	_spawn_retries.erase(slot_index)
 
 	var ability := essence.ability_scene.instantiate() as AbilityBase
 	if ability == null:

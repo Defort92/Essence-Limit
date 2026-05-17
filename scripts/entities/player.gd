@@ -99,6 +99,9 @@ func take_damage(amount: int) -> void:
 	var defense := get_total_stat("defense")
 	var actual_damage := max(1, amount - defense)
 	if is_blocking and _has_shield():
+		# Щит поглощает часть урона. int() отбрасывает дробную часть:
+		# 10 урона × (1 - 0.5) = 5.0 → игрок получает 5
+		#  1 урона × (1 - 0.3) = 0.7 → игрок получает 0 (щит полностью поглотил)
 		actual_damage = int(actual_damage * (1.0 - BLOCK_DAMAGE_REDUCTION))
 	health = max(0, health - actual_damage)
 	health_changed.emit(health, max_health)
