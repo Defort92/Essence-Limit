@@ -41,6 +41,7 @@ from sprite_layer import SpriteLayer
 from image_ops import (
     op_pixel_snap, op_resize_to, op_force_size, op_smart_snap,
     op_remove_chroma, op_chroma_to_alpha, op_crop_to_content, op_foot_baseline,
+    op_pad_to_canvas, build_shared_palette, op_apply_shared_palette,
 )
 from editor_painting import PaintMixin
 from editor_playback import PlaybackMixin
@@ -271,6 +272,11 @@ class SpriteEditor(PaintMixin, PlaybackMixin, FileListMixin, UndoMixin):
         menu.add_separator()
         menu.add_command(label="🎬  Pack Spritesheet…",
                          command=self._open_pack_dialog)
+        menu.add_separator()
+        menu.add_command(label="🎞️  Export PNG sequence (Aseprite)…",
+                         command=self._open_aseprite_png_dialog)
+        menu.add_command(label="🎞️  Export Sprite Sheet (Aseprite)…",
+                         command=self._open_aseprite_sheet_dialog)
         mb["menu"] = menu
 
         # Хоткеи
@@ -989,6 +995,237 @@ class SpriteEditor(PaintMixin, PlaybackMixin, FileListMixin, UndoMixin):
             f"Кадров: {min(len(prepared), cols * rows)} в сетке {cols}×{rows}\n"
             f"Размер клетки: {cell_w}×{cell_h}"
         )
+
+    # ── Aseprite export ──────────────────────────────────────────────────────
+
+    def _gather_aseprite_frames(self) -> list[Image.Image]:
+        """Собрать кадры видимых слоёв с применённым offset.
+        Возвращает кадры РАЗНОГО размера (унификация — на следующем шаге)."""
+        frames = []
+        for layer in self.layers.values():
+            if not layer.visible:
+                continue
+            w, h = layer.current.size
+            composite = Image.new("RGBA", (w, h), (0, 0, 0, 0))
+            composite.paste(layer.current, (layer.offset_x, layer.offset_y),
+                            layer.current)
+            frames.append(composite)
+        return frames
+
+    def _unify_frames(self, frames: list[Image.Image],
+                      anchor: str) -> tuple[list[Image.Image], int, int]:
+        """Подогнать все кадры к общему холсту max(w) × max(h)."""
+        if not frames:
+            return [], 0, 0
+        target_w = max(f.size[0] for f in frames)
+        target_h = max(f.size[1] for f in frames)
+        out = [op_pad_to_canvas(f, target_w, target_h, anchor=anchor)
+               for f in frames]
+        return out, target_w, target_h
+
+    def _maybe_quantize(self, frames: list[Image.Image],
+                        k: int) -> list[Image.Image]:
+        """Если k > 0 — свести все кадры к общей палитре k цветов (Indexed PNG)."""
+        if k <= 0 or not frames:
+            return frames
+        palette = build_shared_palette(frames, k=k)
+        return [op_apply_shared_palette(f, palette) for f in frames]
+
+    def _build_aseprite_dialog(self, title: str, default_out_suffix: str):
+        """Общий диалог для двух Aseprite-экспортов.
+        Возвращает dict с параметрами или None, если отменили."""
+        if not self.layers:
+            messagebox.showinfo("Нечего экспортировать", "Сначала загрузи слои.")
+            return None
+        visible = [l for l in self.layers.values() if l.visible]
+        if not visible:
+            messagebox.showwarning("Нет видимых слоёв",
+                "В экспорт идут только видимые слои (галочка).")
+            return None
+
+        dialog = tk.Toplevel(self.root)
+        dialog.title(title)
+        dialog.configure(bg=DARK["bg"])
+        dialog.transient(self.root)
+        dialog.grab_set()
+        dialog.geometry("460x280")
+
+        result = {"ok": False}
+
+        ttk.Label(dialog, text=f"Видимых кадров: {len(visible)}",
+                  justify="left").pack(anchor="w", padx=12, pady=(10, 8))
+
+        def row(label):
+            f = ttk.Frame(dialog); f.pack(fill="x", padx=12, pady=3)
+            ttk.Label(f, text=label, width=24).pack(side="left")
+            return f
+
+        # Anchor (как выравнивать кадры разного размера)
+        f = row("Выравнивание кадров:")
+        anchor_var = tk.StringVar(value="bottom")
+        ttk.Combobox(f, textvariable=anchor_var, width=14, state="readonly",
+                     values=["bottom", "center", "topleft"]).pack(side="left")
+
+        # Quantize
+        f = row("Общая палитра (Indexed):")
+        quant_var = tk.BooleanVar(value=False)
+        ttk.Checkbutton(f, text="Свести к палитре",
+                        variable=quant_var).pack(side="left")
+        k_var = tk.IntVar(value=32)
+        ttk.Label(f, text="  цветов:").pack(side="left")
+        ttk.Spinbox(f, from_=2, to=256, width=5,
+                    textvariable=k_var).pack(side="left")
+
+        # Output folder
+        f = row("Папка для вывода:")
+        if self.folder:
+            default_out = str(self.folder / default_out_suffix)
+        else:
+            default_out = ""
+        out_var = tk.StringVar(value=default_out)
+        ttk.Entry(f, textvariable=out_var, width=20).pack(
+            side="left", padx=2, fill="x", expand=True)
+        ttk.Button(f, text="…", width=3,
+                   command=lambda: out_var.set(
+                       filedialog.askdirectory() or out_var.get())
+                   ).pack(side="left")
+
+        # Extra slot for caller-specific widgets
+        extra_frame = ttk.Frame(dialog)
+        extra_frame.pack(fill="x", padx=12, pady=4)
+
+        btns = ttk.Frame(dialog); btns.pack(fill="x", padx=12, pady=12)
+        def on_ok():
+            result["ok"] = True
+            dialog.destroy()
+        ttk.Button(btns, text="Export", command=on_ok).pack(side="right", padx=4)
+        ttk.Button(btns, text="Отмена",
+                   command=dialog.destroy).pack(side="right")
+
+        return {
+            "dialog": dialog,
+            "extra_frame": extra_frame,
+            "result": result,
+            "anchor_var": anchor_var,
+            "quant_var": quant_var,
+            "k_var": k_var,
+            "out_var": out_var,
+            "visible": visible,
+        }
+
+    def _open_aseprite_png_dialog(self):
+        """Экспорт всех видимых слоёв как frame_0001.png, frame_0002.png…
+        Все кадры — одного размера. Aseprite: File → Import Sprite Sheet,
+        либо просто перетащить как frames."""
+        ctx = self._build_aseprite_dialog(
+            "Export PNG sequence (Aseprite)", "_aseprite_frames")
+        if ctx is None:
+            return
+
+        # Префикс имени
+        prefix_var = tk.StringVar(value="frame")
+        pf = ttk.Frame(ctx["extra_frame"]); pf.pack(fill="x")
+        ttk.Label(pf, text="Префикс имени файла:", width=24).pack(side="left")
+        ttk.Entry(pf, textvariable=prefix_var, width=14).pack(side="left")
+
+        self.root.wait_window(ctx["dialog"])
+        if not ctx["result"]["ok"]:
+            return
+
+        out_path = Path(ctx["out_var"].get())
+        if not str(out_path):
+            messagebox.showerror("Ошибка", "Не указана папка вывода.")
+            return
+        out_path.mkdir(parents=True, exist_ok=True)
+
+        raw = self._gather_aseprite_frames()
+        unified, tw, th = self._unify_frames(raw, anchor=ctx["anchor_var"].get())
+        if ctx["quant_var"].get():
+            unified = self._maybe_quantize(unified, k=max(2, int(ctx["k_var"].get())))
+
+        prefix = (prefix_var.get() or "frame").strip()
+        for i, frame in enumerate(unified, start=1):
+            frame.save(out_path / f"{prefix}_{i:04d}.png")
+
+        self.status.config(text=f"✓ PNG sequence: {len(unified)} кадров → {out_path}")
+        messagebox.showinfo("Готово",
+            f"Экспортировано {len(unified)} кадров {tw}×{th}\n\n"
+            f"  {out_path}\n\n"
+            f"В Aseprite: File → Import Sprite Sheet → выбрать первый PNG\n"
+            f"(или просто открыть всю папку как кадры).")
+
+    def _open_aseprite_sheet_dialog(self):
+        """Один PNG-атлас с регулярной сеткой, без foot-align — для
+        Aseprite File → Import Sprite Sheet."""
+        ctx = self._build_aseprite_dialog(
+            "Export Sprite Sheet (Aseprite)", "_aseprite_sheet")
+        if ctx is None:
+            return
+
+        n = len(ctx["visible"])
+        suggest_cols = min(n, 8)
+        suggest_rows = (n + suggest_cols - 1) // suggest_cols
+
+        gf = ttk.Frame(ctx["extra_frame"]); gf.pack(fill="x")
+        ttk.Label(gf, text="Сетка (cols × rows):", width=24).pack(side="left")
+        cols_var = tk.IntVar(value=suggest_cols)
+        rows_var = tk.IntVar(value=suggest_rows)
+        ttk.Spinbox(gf, from_=1, to=64, width=5,
+                    textvariable=cols_var).pack(side="left")
+        ttk.Label(gf, text=" × ").pack(side="left")
+        ttk.Spinbox(gf, from_=1, to=64, width=5,
+                    textvariable=rows_var).pack(side="left")
+
+        self.root.wait_window(ctx["dialog"])
+        if not ctx["result"]["ok"]:
+            return
+
+        out_path = Path(ctx["out_var"].get())
+        if not str(out_path):
+            messagebox.showerror("Ошибка", "Не указана папка вывода.")
+            return
+        out_path.mkdir(parents=True, exist_ok=True)
+
+        raw = self._gather_aseprite_frames()
+        unified, cell_w, cell_h = self._unify_frames(
+            raw, anchor=ctx["anchor_var"].get())
+        if ctx["quant_var"].get():
+            # Квантизация делается ПОСЛЕ паддинга, но ДО склейки,
+            # чтобы паддинговая прозрачность не попала в палитру цветов.
+            unified = self._maybe_quantize(
+                unified, k=max(2, int(ctx["k_var"].get())))
+            # Для атласа нужно вернуться в RGBA (паттерн 'P' с transparency
+            # не склеивается в один PNG корректно через paste).
+            unified = [f.convert("RGBA") for f in unified]
+
+        cols = max(1, int(cols_var.get()))
+        rows = max(1, int(rows_var.get()))
+        sheet = ss_mod.pack_aseprite_sheet(
+            unified, cell_w, cell_h, cols, rows,
+            anchor="topleft",  # уже выровнены — кладём как есть
+        )
+
+        png_path = out_path / "spritesheet.png"
+        sheet.save(png_path)
+
+        # Манифест: совместим с уже существующим build_manifest
+        manifest = ss_mod.build_manifest(
+            action="anim", direction="s",
+            frame_count=min(len(unified), cols * rows),
+            cell_w=cell_w, cell_h=cell_h,
+            cols=cols, rows=rows, fps=10,
+        )
+        json_path = out_path / "manifest.json"
+        with open(json_path, "w", encoding="utf-8") as fjson:
+            json.dump(manifest, fjson, indent=2, ensure_ascii=False)
+
+        self.status.config(text=f"✓ Aseprite sheet: {png_path}")
+        messagebox.showinfo("Готово",
+            f"Атлас {cols}×{rows}, клетка {cell_w}×{cell_h}\n\n"
+            f"  {png_path}\n  {json_path}\n\n"
+            f"В Aseprite: File → Import Sprite Sheet →\n"
+            f"  Type: Horizontal Strip / By Grid,\n"
+            f"  Frame Width = {cell_w}, Frame Height = {cell_h}")
 
     # ── Save (folder mode) ───────────────────────────────────────────────────
 

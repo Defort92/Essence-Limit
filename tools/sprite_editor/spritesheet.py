@@ -79,6 +79,33 @@ def pack_spritesheet(
     return sheet
 
 
+def pack_aseprite_sheet(
+    frames: list[Image.Image],
+    cell_w: int,
+    cell_h: int,
+    cols: int,
+    rows: int,
+    anchor: str = "center",
+) -> Image.Image:
+    """
+    Запаковка для Aseprite «Import Sprite Sheet»: каждый кадр кладётся в клетку
+    БЕЗ crop/foot-align — только паддинг прозрачным до cell_w×cell_h.
+    Aseprite потом сам нарежет атлас регулярной сеткой.
+    """
+    from image_ops import op_pad_to_canvas
+
+    sheet = Image.new("RGBA", (cols * cell_w, rows * cell_h), (0, 0, 0, 0))
+    capacity = cols * rows
+    for i, frame in enumerate(frames):
+        if i >= capacity:
+            break
+        c = i % cols
+        r = i // cols
+        cell = op_pad_to_canvas(frame, cell_w, cell_h, anchor=anchor)
+        sheet.paste(cell, (c * cell_w, r * cell_h), cell)
+    return sheet
+
+
 def build_manifest(
     action: str,
     direction: str,

@@ -175,6 +175,80 @@ def op_crop_to_content(img: Image.Image) -> tuple[Image.Image, int, int]:
     return cropped, left, top
 
 
+def op_pad_to_canvas(img: Image.Image, target_w: int, target_h: int,
+                     anchor: str = "center") -> Image.Image:
+    """
+    Поместить изображение в холст target_w × target_h с прозрачным паддингом.
+    anchor: "center" | "topleft" | "bottom" (низ по центру).
+    Если изображение больше холста — обрежется по краям.
+    """
+    rgba = img.convert("RGBA")
+    w, h = rgba.size
+    canvas = Image.new("RGBA", (target_w, target_h), (0, 0, 0, 0))
+    if anchor == "topleft":
+        x, y = 0, 0
+    elif anchor == "bottom":
+        x = (target_w - w) // 2
+        y = target_h - h
+    else:  # center
+        x = (target_w - w) // 2
+        y = (target_h - h) // 2
+    canvas.paste(rgba, (x, y), rgba)
+    return canvas
+
+
+def build_shared_palette(frames: list, k: int = 32) -> Image.Image:
+    """
+    Построить общую палитру k цветов на основе всех кадров.
+    Учитываются только непрозрачные пиксели. Возвращает PIL-картинку
+    в режиме 'P' с палитрой — её можно передать в quantize(palette=...).
+    """
+    if not frames:
+        raise ValueError("build_shared_palette: пустой список кадров")
+
+    pixels = []
+    for f in frames:
+        arr = np.array(f.convert("RGBA"))
+        mask = arr[..., 3] > 0
+        if mask.any():
+            pixels.append(arr[mask][:, :3])
+
+    if not pixels:
+        # Все кадры полностью прозрачные — fallback на первый
+        return frames[0].convert("RGB").quantize(
+            colors=k, method=Image.Quantize.MEDIANCUT
+        )
+
+    all_px = np.concatenate(pixels, axis=0)
+    # Pillow требует 2D-картинку; делаем (N, 1, 3)
+    sample = Image.fromarray(all_px.reshape(-1, 1, 3).astype(np.uint8), "RGB")
+    return sample.quantize(colors=k, method=Image.Quantize.MEDIANCUT)
+
+
+def op_apply_shared_palette(img: Image.Image,
+                            palette_img: Image.Image) -> Image.Image:
+    """
+    Квантизовать img по общей палитре. Возвращает PIL-картинку в режиме 'P'
+    с info['transparency'] — это даёт настоящий Indexed PNG, который
+    Aseprite сразу открывает в режиме Indexed.
+    """
+    rgba = img.convert("RGBA")
+    arr = np.array(rgba)
+    alpha = arr[..., 3]
+    rgb = rgba.convert("RGB")
+    quantized = rgb.quantize(palette=palette_img, dither=Image.Dither.NONE)
+    pal = quantized.getpalette()
+
+    arr_p = np.array(quantized, dtype=np.uint8)
+    transparent_idx = 0
+    arr_p[alpha < 128] = transparent_idx
+
+    out = Image.fromarray(arr_p, mode="P")
+    out.putpalette(pal)
+    out.info["transparency"] = transparent_idx
+    return out
+
+
 def op_foot_baseline(img: Image.Image, target_y: int) -> tuple[Image.Image, int, int]:
     """
     Найти нижний непрозрачный пиксель и подвинуть так, чтобы он попал на target_y.
