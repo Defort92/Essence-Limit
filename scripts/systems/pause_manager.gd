@@ -6,6 +6,11 @@ extends Node
 
 var is_paused: bool = false
 
+func _enter_tree() -> void:
+	# ALWAYS гарантирует, что _unhandled_input работает даже когда дерево поставлено на паузу.
+	# Без этого нажатие "pause" для снятия паузы не сработает.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 signal paused()
 signal unpaused()
 

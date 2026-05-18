@@ -9,7 +9,12 @@ CLAUDE.md
 __pypackages__/
 __pycache__/
 .env
+.env.local
 .envrc
+
+# PixelLab API — состояние израсходованных ключей (хранится локально)
+.pixellab_keys_state.json
+tools/.pixellab_keys_state.json
 .venv
 env/
 venv/

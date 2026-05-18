@@ -24,6 +24,7 @@ signal loot_dropped(items: Array, gold: int, at_position: Vector3)
 
 func _ready() -> void:
 	add_to_group("enemies")
+	LootSpawner.register_enemy(self)
 	if data == null:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
 		return
@@ -144,9 +145,9 @@ func _die() -> void:
 		if data.loot_table:
 			loot_items = data.loot_table.roll()
 			gold_amount += data.loot_table.roll_gold()
-		if gold_amount > 0:
-			GameManager.add_gold(gold_amount)
-		loot_dropped.emit(loot_items, 0, global_position)
+		# Золото и предметы падают в мир как ItemPickup-узлы через LootSpawner.
+		# GameManager.add_gold() не вызывается напрямую — игрок должен подобрать дроп.
+		loot_dropped.emit(loot_items, gold_amount, global_position)
 	_on_die()
 	died.emit(self)
 	queue_free()
