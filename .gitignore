@@ -11,6 +11,7 @@ __pycache__/
 .env
 .env.local
 .envrc
+.vscode/
 
 # PixelLab API — состояние израсходованных ключей (хранится локально)
 .pixellab_keys_state.json
