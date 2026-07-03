@@ -36,6 +36,8 @@ SceneManager="*res://scripts/systems/scene_manager.gd"
 SaveSystem="*res://scripts/systems/save_system.gd"
 PauseManager="*res://scripts/systems/pause_manager.gd"
 LootSpawner="*res://scripts/systems/loot_spawner.gd"
+ShopSystem="*res://scripts/systems/shop_system.gd"
+CraftingSystem="*res://scripts/systems/crafting_system.gd"
 
 [input]
 

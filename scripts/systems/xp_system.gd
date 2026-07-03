@@ -41,7 +41,7 @@ func try_award_boss_kill_xp(floor_id: int, xp_reward: int) -> void:
 ## Сохраняет XP нетронутым — при снятии эффекта уровень восстанавливается через restore_level().
 ## Слоты эссенций блокируются, но не уничтожаются.
 func reduce_level(amount: int) -> void:
-	var new_level := max(MIN_LEVEL, current_level - amount)
+	var new_level: int = max(MIN_LEVEL, current_level - amount)
 	if new_level == current_level:
 		return
 	current_level = new_level

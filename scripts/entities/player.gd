@@ -50,11 +50,15 @@ var quick_slots: Array[String] = ["", "", "", ""]
 
 var is_in_town: bool = true
 
+## 2.5D-спрайт с 8 ракурсами. Может отсутствовать (тогда движение без визуала).
+var _sprite: DirectionalSprite3D = null
+
 signal health_changed(current: int, maximum: int)
 signal died()
 
 func _ready() -> void:
 	add_to_group("player")
+	_sprite = get_node_or_null("Sprite3D") as DirectionalSprite3D
 	_init_race_stats()
 	AchievementSystem.apply_accumulated_to_player(self)
 	EssenceSystem.resize_to_level(XPSystem.current_level)
@@ -88,6 +92,10 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
 
+	# Разворачиваем спрайт по последнему направлению взгляда (движение/атака/уклонение).
+	if _sprite != null and state != State.DEAD:
+		_sprite.face_direction(_last_move_dir)
+
 	move_and_slide()
 
 # ─── Здоровье ──────────────────────────────────────────────────────────────
@@ -97,7 +105,7 @@ func take_damage(amount: int) -> void:
 	if state == State.DEAD or _is_invincible:
 		return
 	var defense := get_total_stat("defense")
-	var actual_damage := max(1, amount - defense)
+	var actual_damage: int = max(1, amount - defense)
 	if is_blocking and _has_shield():
 		# Щит поглощает часть урона. int() отбрасывает дробную часть:
 		# 10 урона × (1 - 0.5) = 5.0 → игрок получает 5
@@ -182,7 +190,7 @@ func _perform_melee_attack() -> void:
 		if dist > atk_range:
 			continue
 		# Ограничиваем удар передней полусферой (~150°).
-		var dir_to_enemy := (enemy.global_position - global_position)
+		var dir_to_enemy: Vector3 = enemy.global_position - global_position
 		dir_to_enemy.y = 0.0
 		if dir_to_enemy.length_squared() > 0.001 and _last_move_dir.dot(dir_to_enemy.normalized()) < -0.5:
 			continue
@@ -300,9 +308,12 @@ func _init_race_stats() -> void:
 	base_intellect  = stats.get("intellect", 10)
 
 	# Восстановить quick_slots из сохранения если есть.
+	# saved_quick_slots не типизирован (может прийти из JSON), поэтому копируем
+	# поэлементно с приведением к String, сохраняя тип quick_slots: Array[String].
 	var saved := GameManager.saved_quick_slots
 	if saved.size() == quick_slots.size():
-		quick_slots = saved.duplicate()
+		for i in range(quick_slots.size()):
+			quick_slots[i] = str(saved[i])
 		GameManager.saved_quick_slots = ["", "", "", ""]
 
 	# SaveSystem записывает saved_health при загрузке; -1 → старт с полным HP.

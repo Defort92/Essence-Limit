@@ -17,6 +17,9 @@ var state: State = State.IDLE
 var _player: Player = null
 var _attack_cooldown: float = 0.0
 
+## 2.5D-спрайт с 8 ракурсами. Может отсутствовать (тогда враг без визуала).
+var _sprite: DirectionalSprite3D = null
+
 signal died(enemy: Enemy)
 signal health_changed(current: int, maximum: int)
 ## Испускается при смерти. Сцена уровня слушает этот сигнал и спавнит ItemPickup-узлы.
@@ -24,6 +27,7 @@ signal loot_dropped(items: Array, gold: int, at_position: Vector3)
 
 func _ready() -> void:
 	add_to_group("enemies")
+	_sprite = get_node_or_null("Sprite3D") as DirectionalSprite3D
 	LootSpawner.register_enemy(self)
 	if data == null:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
@@ -46,7 +50,17 @@ func _physics_process(delta: float) -> void:
 		State.IDLE:   _tick_idle()
 		State.CHASE:  _tick_chase(delta)
 		State.ATTACK: _tick_attack()
+	_update_facing()
 	move_and_slide()
+
+## Разворачивает спрайт по движению; в покое/атаке — лицом к игроку.
+func _update_facing() -> void:
+	if _sprite == null:
+		return
+	var face := Vector3(velocity.x, 0.0, velocity.z)
+	if face.length_squared() < 0.01 and _player != null:
+		face = _player.global_position - global_position
+	_sprite.face_direction(face)
 
 # ─── Стат-система ──────────────────────────────────────────────────────────
 
@@ -83,7 +97,7 @@ func remove_modifiers_by_source(source_id: String) -> void:
 func take_damage(amount: int) -> void:
 	if state == State.DEAD:
 		return
-	var actual_damage := max(1, amount - get_stat_int("defense"))
+	var actual_damage: int = max(1, amount - get_stat_int("defense"))
 	health = max(0, health - actual_damage)
 	health_changed.emit(health, get_stat_int("max_health"))
 	if health == 0:

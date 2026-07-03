@@ -34,6 +34,7 @@
 | AchievementSystem | `scripts/systems/achievement_system.gd` | ✅ достижения + накопленные награды (persistent) |
 | SceneManager | `scripts/systems/scene_manager.gd` | ✅ смена сцен |
 | AuraComponent | `scripts/components/aura_component.gd` | ✅ пассивный эффект в радиусе |
+| DirectionalSprite3D | `scripts/components/directional_sprite.gd` | ✅ 8 ракурсов, смена по направлению взгляда |
 | AbilityBase | `scripts/entities/ability_base.gd` | ✅ базовый класс способности |
 | BossBase | `scripts/entities/boss_base.gd` | ✅ враг с фазами |
 | AchievementData | `scripts/data/achievement_data.gd` | ✅ Resource-класс |
@@ -48,7 +49,45 @@
 | EnemyData | `scripts/data/enemy_data.gd` | ✅ + LootTable |
 | LootTable | `scripts/systems/loot_table.gd` | ✅ весовой дроп |
 | main.tscn | `scenes/main.tscn` | ✅ тестовый уровень |
-| player.tscn | `scenes/characters/player.tscn` | ✅ капсула-placeholder |
+| player.tscn | `scenes/characters/player.tscn` | ✅ 8-направленный спрайт (base) |
+| enemy_base.tscn | `scenes/characters/enemy_base.tscn` | ✅ 8-направленный спрайт (red tint) + Enemy |
+| hud.tscn | `scenes/ui/hud.tscn` | ✅ HP / золото / уровень |
+
+---
+
+## Сводка: что сделано и что осталось
+
+> Кратко: **слой логики (GDScript) практически готов**, а **слой сцен / UI / контента — почти пустой**.
+> Дальше работа в основном в редакторе Godot: сцены, узлы, `.tres`-ресурсы и привязка к уже готовым системам.
+
+### ✅ Логика (код) — реализовано
+
+- **Боевая система игрока** (`player.gd`): движение, уклонение с i-frames, атака ближнего/дальнего боя, блок щитом, кулдауны по типу оружия, расчёт урона от силы/оружия.
+- **Статы с модификаторами** (`player.gd`, `enemy.gd`): `base + снаряжение + эссенции + ADD/MULTIPLY-модификаторы`, пересчёт max_health.
+- **AI врага** (`enemy.gd`): машина состояний IDLE → CHASE → ATTACK, детект игрока, атака, смерть.
+- **Дроп и лут** (`enemy.gd`, `loot_table.gd`, `loot_spawner.gd`): весовой роллинг, золото, спавн дропа в мир.
+- **Боссы по фазам** (`boss_base.gd`): автопереход фаз по % HP, хук `_on_phase_changed`.
+- **Поломка снаряжения** (`enemy.gd::_break_random_equipment`) — готовый хук для атак боссов.
+- **Все core-системы как синглтоны**: XP/уровни/first-kill, эссенции и слоты, инвентарь, хранилище, снаряжение, портал, ауры, расовые пассивки, достижения, расходники, save/load, пауза, смена сцен.
+- **Бэкенд создания персонажа** (`game_manager.gd`): расы, базовые статы, `new_game()`, золото.
+- **2.5D-спрайты персонажей** (`directional_sprite.gd`): 8 ракурсов, смена текстуры по направлению взгляда; подключены к игроку (`player.gd`) и врагу (`enemy.gd`). Базовые модельки — в `assets/sprites/characters/base/` (8 направлений, 128×128, billboard FIXED_Y, nearest-фильтр).
+
+### 🚧 Логика (код) — ещё НЕ добавлена / заглушки
+
+- **Дальний бой — заглушка**: `player.gd::_perform_ranged_attack` бьёт мгновенно по ближайшему врагу. Нужен `ProjectileComponent` (снаряд с визуалом и полётом).
+- **`scripts/world/`** пуст: нет `transition_zone.gd` (переходы между локациями) и `portal_zone.gd` (вход в подземелье).
+- **`boss_manager.gd`** не создан — нет проверки условий появления боссов этажа.
+- **Расовые механики-скрипты** не созданы: татуировки варвара, дух эльфа, обряды демона/ангела, зачарование оружия человека (хотя `EssenceSystem.add_bonus_slot()` и `RacialPassiveSystem` уже готовы как фундамент).
+- **Прогрессия сложности подземелья** (множители HP/урона по этажам) не реализована.
+- **Скрытые уникальные мобы** (Area3D-триггеры появления) не реализованы.
+
+### 📦 Сцены / UI / контент — почти не сделано
+
+- Сцены есть только: `main`, `player`, `enemy_base`, `hud` (все — placeholder-капсулы).
+- **Нет UI-сцен**: создание персонажа, главное меню, пауза, инвентарь, снаряжение, хранилище, эссенции, магазин, экран смерти, попапы XP.
+- **Нет мировых сцен**: человеческий город, 4 стартовые локации рас, 15 этажей подземелья.
+- **Контента-ресурсов `.tres` почти нет**: только `resources/enemies/goblin.tres`. Нет эссенций, достижений, других врагов, данных этажей.
+- **Нет полоски HP над врагом**, мигания при уроне, анимаций, звуков, частиц.
 
 ---
 
@@ -104,7 +143,7 @@
 - [x] **1.1** Убедиться что `main.tscn` запускается — капсула ходит по полу, камера следит
 - [x] **1.2** Создать `scenes/ui/hud.tscn` + `scripts/ui/hud.gd` — полоска HP, золото, уровень
 - [ ] **1.3** Настроить угол камеры (`offset` в `scripts/camera/game_camera.gd`)
-- [ ] **1.4** Создать `scenes/characters/enemy_test.tscn` — враг ходит к игроку, бьёт, умирает
+- [x] **1.4** Враг ходит к игроку, бьёт, умирает — `enemy.gd` + `scenes/characters/enemy_base.tscn` (логика готова)
 - [ ] **1.5** Мигание красным при получении урона (Tween на материале или модуляции)
 
 ---
@@ -139,12 +178,12 @@
 
 ## Этап 5 — Боевая система
 
-- [ ] **5.1** Добавить в `scenes/characters/player.tscn` AttackArea (Area3D перед персонажем)
-- [ ] **5.2** В `scripts/entities/player.gd`: по ЛКМ — активировать Area3D, нанести урон Enemy в зоне
-- [ ] **5.3** Уклонение (Пробел) — рывок + временный i-frame (неуязвимость ~0.3 сек)
-- [ ] **5.4** Полоска HP над головой врага (billboard ProgressBar или Label3D)
-- [ ] **5.5** Смерть врага: анимация исчезновения, спавн ItemPickup через сигнал `loot_dropped`
-- [ ] **5.6** Создать `scenes/ui/death_screen.tscn` — "Вы погибли" + кнопка возврата в город
+- [~] **5.1** AttackArea (Area3D) — заменено в коде на перебор группы `enemies` по дистанции в `player.gd::_perform_melee_attack` (Area3D не требуется)
+- [x] **5.2** По ЛКМ — урон Enemy в зоне досягаемости — `player.gd::_perform_attack` (логика готова)
+- [x] **5.3** Уклонение (Пробел) — рывок + i-frame — `player.gd::_handle_dodge_input` / `_is_invincible`
+- [ ] **5.4** Полоска HP над головой врага (billboard ProgressBar или Label3D) — сигнал `enemy.health_changed` есть, UI нет
+- [~] **5.5** Спавн ItemPickup через сигнал `loot_dropped` — логика готова (`enemy.gd` + `loot_spawner.gd`); осталась анимация исчезновения
+- [ ] **5.6** Создать `scenes/ui/death_screen.tscn` — "Вы погибли" + кнопка возврата в город (сигнал `GameManager.player_died` готов)
 
 ---
 
@@ -219,8 +258,8 @@
 
 ## Этап 13 — Боссы этажей
 
-- [ ] **13.1** `scripts/entities/boss.gd` (extends Enemy) с поддержкой фаз (`phase_thresholds: Array[float]`)
-- [ ] **13.2** Переход фаз по % HP: смена паттерна атак, усиление характеристик
+- [x] **13.1** Базовый класс босса с фазами — реализован как `scripts/entities/boss_base.gd` (extends Enemy, `phase_thresholds: Array[float]`)
+- [x] **13.2** Переход фаз по % HP — `boss_base.gd::_check_phase_transition` + хук `_on_phase_changed` (паттерны атак переопределяются в наследниках)
 - [ ] **13.3** `scripts/dungeon/boss_manager.gd` — проверяет условия появления босса
 - [ ] **13.4** Уникальный дроп с босса через LootTable
 
