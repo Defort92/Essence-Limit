@@ -16,3 +16,4 @@ xp_reward = 30
 gold_drop_min = 1
 gold_drop_max = 5
 is_unique = false
+sprite_tint = Color(1, 0.55, 0.55, 1)

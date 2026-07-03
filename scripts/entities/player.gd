@@ -19,6 +19,9 @@ const UNARMED_COOLDOWN: float = 0.6
 const UNARMED_DAMAGE_BASE: int = 3
 const UNARMED_RANGE: float = 1.2
 
+## Раз в это время (сек) применяется пассивная регенерация HP (стат "regen").
+const REGEN_TICK_INTERVAL: float = 1.0
+
 enum State { IDLE, MOVE, DODGE, ATTACK, DEAD }
 var state: State = State.IDLE
 
@@ -27,6 +30,7 @@ var _dodge_direction: Vector3 = Vector3.ZERO
 var _last_move_dir: Vector3 = Vector3.BACK
 var _attack_timer: float = 0.0
 var _attack_state_timer: float = 0.0
+var _regen_timer: float = 0.0
 
 ## true во время уклонения — игрок не получает урон (i-frames).
 var _is_invincible: bool = false
@@ -72,6 +76,7 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
+	_tick_passive_regen(delta)
 
 	match state:
 		State.IDLE, State.MOVE:
@@ -113,14 +118,33 @@ func take_damage(amount: int) -> void:
 		actual_damage = int(actual_damage * (1.0 - BLOCK_DAMAGE_REDUCTION))
 	health = max(0, health - actual_damage)
 	health_changed.emit(health, max_health)
+	if _sprite != null:
+		_sprite.flash(Color(1.0, 0.2, 0.2))
 	if health == 0:
 		state = State.DEAD
 		died.emit()
 
 ## Восстанавливает [param amount] HP, не превышая max_health.
-func heal(amount: int) -> void:
+## [param flash] = false подавляет вспышку (используется пассивной регенерацией).
+func heal(amount: int, flash: bool = true) -> void:
+	if amount <= 0:
+		return
 	health = min(max_health, health + amount)
 	health_changed.emit(health, max_health)
+	if flash and _sprite != null:
+		_sprite.flash(Color(0.3, 1.0, 0.4))
+
+## Раз в REGEN_TICK_INTERVAL секунд восстанавливает HP на величину стата "regen".
+func _tick_passive_regen(delta: float) -> void:
+	if state == State.DEAD:
+		return
+	_regen_timer += delta
+	if _regen_timer < REGEN_TICK_INTERVAL:
+		return
+	_regen_timer = 0.0
+	var regen: int = get_total_stat("regen")
+	if regen > 0:
+		heal(regen, false)
 
 # ─── Статы ─────────────────────────────────────────────────────────────────
 
@@ -155,6 +179,20 @@ func remove_modifiers_by_source(source_id: String) -> void:
 			filtered.append(modifier)
 	_modifiers = filtered
 	_recalculate_derived_stats()
+
+## Накладывает модификатор на [param duration] секунд (0 = бессрочно, снимать вручную).
+## Подсвечивает спрайт: синим для бафа, фиолетовым для дебафа.
+func apply_timed_modifier(modifier: StatModifier, duration: float, is_debuff: bool = false) -> void:
+	apply_modifier(modifier)
+	if _sprite != null:
+		_sprite.flash(Color(0.7, 0.3, 0.9) if is_debuff else Color(0.35, 0.55, 1.0))
+	if duration > 0.0 and is_inside_tree():
+		var source_id_copy: String = modifier.source_id
+		get_tree().create_timer(duration).timeout.connect(
+			func() -> void:
+				if is_instance_valid(self):
+					remove_modifiers_by_source(source_id_copy)
+		)
 
 # ─── Атака ─────────────────────────────────────────────────────────────────
 

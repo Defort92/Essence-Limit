@@ -67,12 +67,13 @@ func new_game(race: Race, name: String) -> void:
 
 	new_game_started.emit(race, name)
 
-## Обрабатывает смерть игрока: закрывает портал и испускает сигнал для SceneManager/UI.
+## Обрабатывает смерть игрока: закрывает портал, испускает сигнал и открывает экран смерти.
 ## Вызывается Player при срабатывании сигнала died.
 func on_player_died() -> void:
 	DungeonPortal.close_portal()
 	saved_health = -1  # Полное HP при возрождении
 	player_died.emit()
+	SceneManager.go_to_death_screen()
 
 ## Возвращает стартовые статы для [param race].
 func get_race_base_stats(race: Race) -> Dictionary:

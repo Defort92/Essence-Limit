@@ -26,3 +26,8 @@ class_name EnemyData
 
 @export_group("Flags")
 @export var is_unique: bool = false
+
+@export_group("Visual")
+## Заглушка вместо уникального спрайта: базовый гуманоид перекрашивается в этот цвет.
+## Заменить на свой набор текстур в сцене (Sprite3D → tex_*), когда появится арт монстра.
+@export var sprite_tint: Color = Color.WHITE

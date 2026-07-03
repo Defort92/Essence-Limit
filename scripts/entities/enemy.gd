@@ -10,6 +10,9 @@ var health: int
 var _modifiers: Array[StatModifier] = []
 
 const GRAVITY: float = -20.0
+## Раз в это время (сек) применяется пассивная регенерация HP (стат "regen").
+const REGEN_TICK_INTERVAL: float = 1.0
+var _regen_timer: float = 0.0
 
 enum State { IDLE, CHASE, ATTACK, DEAD }
 var state: State = State.IDLE
@@ -32,6 +35,8 @@ func _ready() -> void:
 	if data == null:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
 		return
+	if _sprite != null:
+		_sprite.modulate = data.sprite_tint
 	health = get_stat_int("max_health")
 	# Ищем Player в следующем кадре, чтобы он успел добавиться в группу.
 	# Проверяем is_inside_tree() перед доступом — на случай если Enemy удалён до этого кадра.
@@ -46,6 +51,7 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
 	_attack_cooldown = max(0.0, _attack_cooldown - delta)
+	_tick_passive_regen(delta)
 	match state:
 		State.IDLE:   _tick_idle()
 		State.CHASE:  _tick_chase(delta)
@@ -93,6 +99,20 @@ func remove_modifiers_by_source(source_id: String) -> void:
 			filtered.append(modifier)
 	_modifiers = filtered
 
+## Накладывает модификатор на [param duration] секунд (0 = бессрочно, снимать вручную).
+## Подсвечивает спрайт: синим для бафа, фиолетовым для дебафа.
+func apply_timed_modifier(modifier: StatModifier, duration: float, is_debuff: bool = false) -> void:
+	apply_modifier(modifier)
+	if _sprite != null:
+		_sprite.flash(Color(0.7, 0.3, 0.9) if is_debuff else Color(0.35, 0.55, 1.0))
+	if duration > 0.0 and is_inside_tree():
+		var source_id_copy: String = modifier.source_id
+		get_tree().create_timer(duration).timeout.connect(
+			func() -> void:
+				if is_instance_valid(self):
+					remove_modifiers_by_source(source_id_copy)
+		)
+
 ## Наносит урон с учётом защиты врага. Минимальный урон — 1.
 func take_damage(amount: int) -> void:
 	if state == State.DEAD:
@@ -100,8 +120,33 @@ func take_damage(amount: int) -> void:
 	var actual_damage: int = max(1, amount - get_stat_int("defense"))
 	health = max(0, health - actual_damage)
 	health_changed.emit(health, get_stat_int("max_health"))
+	if _sprite != null:
+		_sprite.flash(Color(1.0, 0.2, 0.2))
 	if health == 0:
 		_die()
+
+## Восстанавливает HP, не превышая max_health. [param flash] = false подавляет вспышку
+## (используется пассивной регенерацией, чтобы не мигать каждую секунду).
+func heal(amount: int, flash: bool = true) -> void:
+	if state == State.DEAD or amount <= 0:
+		return
+	var max_hp: int = get_stat_int("max_health")
+	health = min(max_hp, health + amount)
+	health_changed.emit(health, max_hp)
+	if flash and _sprite != null:
+		_sprite.flash(Color(0.3, 1.0, 0.4))
+
+## Раз в REGEN_TICK_INTERVAL секунд восстанавливает HP на величину стата "regen".
+func _tick_passive_regen(delta: float) -> void:
+	if state == State.DEAD:
+		return
+	_regen_timer += delta
+	if _regen_timer < REGEN_TICK_INTERVAL:
+		return
+	_regen_timer = 0.0
+	var regen: int = get_stat_int("regen")
+	if regen > 0:
+		heal(regen, false)
 
 func _base_stat(stat_name: String) -> float:
 	match stat_name:
