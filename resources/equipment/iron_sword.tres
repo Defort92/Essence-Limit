@@ -1,0 +1,19 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "iron_sword"
+display_name = "Железный меч"
+description = "Простой одноручный меч. +5 к урону."
+rarity = 0
+buy_price = 50
+sell_price = 15
+is_stackable = false
+max_stack = 1
+slot = 4
+weapon_type = 1
+stat_bonuses = {
+"damage": 5
+}

@@ -1,0 +1,182 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/pause_menu.gd" id="1_script"]
+
+[node name="PauseMenu" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.016, 0.012, 0.016, 0.72)
+
+[node name="CenterContainer" type="CenterContainer" parent="Dim"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Panel" type="Panel" parent="Dim/CenterContainer"]
+custom_minimum_size = Vector2(400, 0)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Dim/CenterContainer/Panel"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Dim/CenterContainer/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="TitleLabel" type="Label" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 26
+text = "ПАУЗА"
+horizontal_alignment = 1
+
+[node name="TitleSpacer" type="Control" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="ResumeButton" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Продолжить"
+
+[node name="SaveRow" type="HBoxContainer" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="SaveLabel" type="Label" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Сохранить:"
+
+[node name="Slot1Button" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow"]
+layout_mode = 2
+text = "1"
+
+[node name="Slot2Button" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow"]
+layout_mode = 2
+text = "2"
+
+[node name="Slot3Button" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow"]
+layout_mode = 2
+text = "3"
+
+[node name="SettingsButton" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Настройки"
+
+[node name="MainMenuButton" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Выйти в главное меню"
+
+[node name="QuitButton" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Выйти из игры"
+
+[node name="SettingsPanel" type="Panel" parent="Dim"]
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -230.0
+offset_top = -170.0
+offset_right = 230.0
+offset_bottom = 170.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="Margin" type="MarginContainer" parent="Dim/SettingsPanel"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="Dim/SettingsPanel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleLabel" type="Label" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 24
+text = "НАСТРОЙКИ"
+horizontal_alignment = 1
+
+[node name="VolumeRow" type="HBoxContainer" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="VolumeLabel" type="Label" parent="Dim/SettingsPanel/Margin/VBoxContainer/VolumeRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Громкость"
+
+[node name="VolumeSlider" type="HSlider" parent="Dim/SettingsPanel/Margin/VBoxContainer/VolumeRow"]
+custom_minimum_size = Vector2(160, 20)
+layout_mode = 2
+min_value = 0.0
+max_value = 1.0
+step = 0.05
+value = 1.0
+
+[node name="Separator1" type="ColorRect" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.471, 0.376, 0.212, 0.16)
+
+[node name="FullscreenRow" type="HBoxContainer" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="FullscreenLabel" type="Label" parent="Dim/SettingsPanel/Margin/VBoxContainer/FullscreenRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Полноэкранный режим"
+
+[node name="FullscreenCheck" type="CheckButton" parent="Dim/SettingsPanel/Margin/VBoxContainer/FullscreenRow"]
+layout_mode = 2
+
+[node name="Separator2" type="ColorRect" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+color = Color(0.471, 0.376, 0.212, 0.16)
+
+[node name="ControlsButton" type="Button" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Управление"
+
+[node name="BackButton" type="Button" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Назад"
+
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/ResumeButton" to="." method="_on_resume_pressed"]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow/Slot1Button" to="." method="_on_save_slot_pressed" binds=[0]]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow/Slot2Button" to="." method="_on_save_slot_pressed" binds=[1]]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/SaveRow/Slot3Button" to="." method="_on_save_slot_pressed" binds=[2]]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/SettingsButton" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/MainMenuButton" to="." method="_on_main_menu_pressed"]
+[connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/QuitButton" to="." method="_on_quit_pressed"]
+[connection signal="pressed" from="Dim/SettingsPanel/Margin/VBoxContainer/ControlsButton" to="." method="_on_controls_pressed"]
+[connection signal="pressed" from="Dim/SettingsPanel/Margin/VBoxContainer/BackButton" to="." method="_on_settings_back_pressed"]
+[connection signal="value_changed" from="Dim/SettingsPanel/Margin/VBoxContainer/VolumeRow/VolumeSlider" to="." method="_on_volume_changed"]
+[connection signal="toggled" from="Dim/SettingsPanel/Margin/VBoxContainer/FullscreenRow/FullscreenCheck" to="." method="_on_fullscreen_toggled"]

@@ -3,8 +3,10 @@
 ## При экипировке нового предмета старый автоматически уходит в рюкзак.
 ## Сломанный предмет не даёт статов и помечается в UI как broken.
 ## Починка доступна у ремесленника в городе за золото.
-## Является Autoload-синглтоном; регистрировать как "EquipmentManager" в Project Settings.
+## Компонент на каждого участника отряда — дочерний узел "Equipment" в player.tscn.
+## У каждого персонажа своё снаряжение, доступ через Player.equipment.
 extends Node
+class_name EquipmentManager
 
 const MAX_ACCESSORIES: int = 3
 ## Стоимость починки = buy_price / REPAIR_COST_DIVISOR (минимум 1 золото).
@@ -100,6 +102,11 @@ func get_equipped(slot: EquipmentData.Slot) -> EquipmentData:
 ## Возвращает копию списка надетых аксессуаров.
 func get_accessories() -> Array[EquipmentData]:
 	return _accessories.duplicate()
+
+## Возвращает [code]true[/code] если надет хотя бы один предмет (слот или аксессуар).
+## Используется LootableCorpse, чтобы понять, есть ли что снять с павшего союзника.
+func has_any_equipped() -> bool:
+	return not _equipped.is_empty() or not _accessories.is_empty()
 
 ## Возвращает суммарный бонус стата [param stat] от всего надетого снаряжения.
 ## Сломанные предметы не учитываются.

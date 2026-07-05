@@ -1,8 +1,10 @@
-## Управляет активными способностями игрока, полученными через эссенции.
-## Слушает EssenceSystem.essence_equipped/removed и автоматически спавнит/удаляет AbilityBase-узлы.
-## Input Actions ability_1..ability_4 биндятся на первые 4 слота эссенций.
-## Является Autoload-синглтоном; регистрировать как "AbilityManager" в Project Settings.
+## Управляет активными способностями участника отряда, полученными через эссенции.
+## Слушает Essence.essence_equipped/removed своего владельца и автоматически спавнит/удаляет
+## AbilityBase-узлы. Input Actions ability_1..ability_4 реагируют только если владелец сейчас
+## под управлением игрока (control_mode == HUMAN) — у ИИ-союзников свой способ вызова способностей.
+## Компонент на каждого участника отряда — дочерний узел "Abilities" в player.tscn.
 extends Node
+class_name AbilityManager
 
 ## Маппинг Input Action → индекс слота эссенции.
 ## Добавь ability_1..ability_4 в Project Settings → Input Map (клавиши Q/E/R/F).
@@ -18,22 +20,23 @@ var bindings: Dictionary = DEFAULT_BINDINGS.duplicate()
 ## Словарь: slot_index (int) → AbilityBase.
 var _active_abilities: Dictionary = {}
 
-## Количество попыток найти Player перед отказом от спавна.
-const MAX_SPAWN_RETRIES: int = 10
-## slot_index → счётчик попыток.
-var _spawn_retries: Dictionary = {}
+## Владелец-персонаж (родительский узел в player.tscn) и его слоты эссенций.
+@onready var _owner_player: Player = get_parent() as Player
+@onready var _essence: EssenceSystem = get_parent().get_node("Essence") as EssenceSystem
 
 signal ability_added(slot_index: int, ability: AbilityBase)
 signal ability_removed(slot_index: int)
 signal ability_activated(slot_index: int)
 
 func _ready() -> void:
-	EssenceSystem.essence_equipped.connect(_on_essence_equipped)
-	EssenceSystem.essence_removed.connect(_on_essence_removed)
+	_essence.essence_equipped.connect(_on_essence_equipped)
+	_essence.essence_removed.connect(_on_essence_removed)
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _owner_player.control_mode != Player.ControlMode.HUMAN:
+		return
 	for action in bindings:
-		if event.is_action_just_pressed(action):
+		if event.is_action_pressed(action):
 			activate_ability(bindings[action])
 
 ## Активирует способность в слоте [param slot_index].
@@ -54,12 +57,12 @@ func get_ability(slot_index: int) -> AbilityBase:
 func get_all_abilities() -> Dictionary:
 	return _active_abilities.duplicate()
 
-## Перестраивает все способности из текущего состояния EssenceSystem.slots.
+## Перестраивает все способности из текущего состояния слотов эссенций владельца.
 ## Вызывается SaveSystem после загрузки сохранения.
 func rebuild_from_slots() -> void:
 	_clear_all()
-	for idx in EssenceSystem.slots.size():
-		var essence: EssenceData = EssenceSystem.slots[idx]
+	for idx in _essence.slots.size():
+		var essence: EssenceData = _essence.slots[idx]
 		if essence != null and essence.ability_scene != null:
 			_spawn_ability(idx, essence)
 
@@ -80,26 +83,13 @@ func _on_essence_removed(slot_index: int) -> void:
 	ability_removed.emit(slot_index)
 
 func _spawn_ability(slot_index: int, essence: EssenceData) -> void:
-	var player := _find_player()
-	if player == null:
-		var retries: int = _spawn_retries.get(slot_index, 0)
-		if retries >= MAX_SPAWN_RETRIES:
-			push_warning("AbilityManager: Player не найден за %d попыток, спавн способности отменён (slot %d)" % [MAX_SPAWN_RETRIES, slot_index])
-			_spawn_retries.erase(slot_index)
-			return
-		_spawn_retries[slot_index] = retries + 1
-		call_deferred("_spawn_ability", slot_index, essence)
-		return
-
-	_spawn_retries.erase(slot_index)
-
 	var ability := essence.ability_scene.instantiate() as AbilityBase
 	if ability == null:
 		push_error("AbilityManager: сцена '%s' не содержит AbilityBase" % essence.ability_scene.resource_path)
 		return
 
-	ability.caster = player
-	player.add_child(ability)
+	ability.caster = _owner_player
+	_owner_player.add_child(ability)
 	_active_abilities[slot_index] = ability
 	ability_added.emit(slot_index, ability)
 
@@ -108,9 +98,3 @@ func _clear_all() -> void:
 		if is_instance_valid(ability):
 			ability.queue_free()
 	_active_abilities.clear()
-
-func _find_player() -> Player:
-	var scene_tree := Engine.get_main_loop() as SceneTree
-	if scene_tree:
-		return scene_tree.get_first_node_in_group("player") as Player
-	return null

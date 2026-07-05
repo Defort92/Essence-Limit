@@ -1,6 +1,10 @@
-## Персонаж игрока: движение, уклонение, атака, блок, HP, статы с модификаторами.
-## Статы = base (раса + уровень) + EquipmentManager + EssenceSystem + _modifiers.
-## Добавляется в группу "player" для поиска через get_first_node_in_group.
+## Персонаж-участник отряда: движение, уклонение, атака, блок, HP, статы с модификаторами.
+## Статы = base (раса + уровень) + equipment + essence + _modifiers.
+## Экипировка/эссенции/способности — свои у каждого участника (дочерние компоненты
+## Equipment/Essence/Abilities в player.tscn), не общие на весь отряд.
+## Один и тот же скрипт используется и для главного героя, и для союзников — разница
+## только в control_mode (HUMAN/AI), см. PartySystem. Группа "player" держит только
+## текущего активного (управляемого игроком) участника; "party"/"combatants" — всех.
 extends CharacterBody3D
 class_name Player
 
@@ -9,6 +13,8 @@ const MOVE_SPEED: float = 5.0
 const GRAVITY: float = -20.0
 const DODGE_SPEED: float = 12.0
 const DODGE_DURATION: float = 0.25
+## Дистанция до целевой точки (режим бега мышью), на которой персонаж считается пришедшим.
+const MOVE_STOP_DISTANCE: float = 0.2
 
 # --- Константы боя ---
 ## Длительность состояния ATTACK (окно блокировки повторного удара).
@@ -18,16 +24,69 @@ const BLOCK_DAMAGE_REDUCTION: float = 0.5
 const UNARMED_COOLDOWN: float = 0.6
 const UNARMED_DAMAGE_BASE: int = 3
 const UNARMED_RANGE: float = 1.2
+## Прибавка к шансу крита за единицу ловкости (agility). 0.005 = +0.5% крита за очко.
+const AGILITY_CRIT_FACTOR: float = 0.005
 
 ## Раз в это время (сек) применяется пассивная регенерация HP (стат "regen").
 const REGEN_TICK_INTERVAL: float = 1.0
 
+# --- Константы ИИ-поведения союзников (когда control_mode == AI) ---
+## Дистанция, дальше которой ИИ-союзник подтягивается к лидеру отряда.
+const AI_FOLLOW_DISTANCE: float = 2.5
+## Дистанция, дальше которой подтягивание ускоряется (отстал слишком сильно).
+const AI_FOLLOW_CATCHUP_DISTANCE: float = 6.0
+## Радиус, в котором ИИ-союзник сам находит и атакует ближайшего врага.
+const AI_ENGAGE_RANGE: float = 8.0
+
 enum State { IDLE, MOVE, DODGE, ATTACK, DEAD }
 var state: State = State.IDLE
+
+## Все участники отряда — PLAYER (см. scripts/data/faction.gd). Используется таргетингом
+## врагов и атак, чтобы не бить союзников и находить враждебные по фракции цели.
+var faction: Faction.Kind = Faction.Kind.PLAYER
+
+## HUMAN — читает Input и управляется игроком. AI — управляется автономным поведением
+## союзника (следование за лидером отряда, авто-атака в радиусе). Переключается через
+## PartySystem.switch_active() при выборе активного персонажа или смерти текущего.
+enum ControlMode { HUMAN, AI }
+var control_mode: ControlMode = ControlMode.HUMAN
+
+## Индекс записи этого участника в PartySystem.roster. -1 у статического Player сцены
+## до регистрации (PartySystem назначит 0 — герой) и у покинувших отряд (предатель/беглец).
+var roster_index: int = -1
+
+## Раса участника: у героя — из создания персонажа, у наёмника — из CompanionData.
+## Определяет базовые статы через GameManager.RACE_BASE_STATS.
+var race: int = 0
+var member_name: String = ""
+
+## Доверие/признание наёмника к главному герою (0..100). При падении до 0 наёмник
+## предаёт отряд (становится врагом) или сбегает — см. PartySystem.on_trust_bottomed().
+## В будущем также будет влиять на приоритеты ИИ (лечить/баффать лидера охотнее).
+var trust: int = 100
+
+## true после предательства: фракция сменена на HOSTILE_NPC, отряд покинут.
+var _is_traitor: bool = false
+## true во время побега с поля боя: не сражается, убегает и исчезает по таймеру.
+var _is_fleeing: bool = false
+
+## Сколько секунд беглец остаётся в сцене, прежде чем исчезнуть.
+const FLEE_DESPAWN_TIME: float = 6.0
+
+## Своя экипировка/эссенции/способности — не общие на отряд, см. player.tscn.
+@onready var equipment: EquipmentManager = $Equipment
+@onready var essence: EssenceSystem = $Essence
+@onready var ability_manager: AbilityManager = $Abilities
+@onready var statuses: StatusComponent = $Statuses
 
 var _dodge_timer: float = 0.0
 var _dodge_direction: Vector3 = Vector3.ZERO
 var _last_move_dir: Vector3 = Vector3.BACK
+
+## Целевая точка для режима бега мышью (InputSettings.MovementMode.MOUSE). Персонаж бежит
+## к ней, пока не окажется ближе MOVE_STOP_DISTANCE; сбрасывается при переходе под ИИ.
+var _move_target: Vector3 = Vector3.ZERO
+var _has_move_target: bool = false
 var _attack_timer: float = 0.0
 var _attack_state_timer: float = 0.0
 var _regen_timer: float = 0.0
@@ -35,6 +94,10 @@ var _regen_timer: float = 0.0
 ## true во время уклонения — игрок не получает урон (i-frames).
 var _is_invincible: bool = false
 var is_blocking: bool = false
+
+## Сколько ещё секунд участник неуязвим после переключения на него через PartySystem
+## (защита от мгновенной смерти, если управление передали посреди боя).
+var _post_switch_invuln_timer: float = 0.0
 
 # --- Статы ---
 ## База HP (раса + уровень). Не включает бонусы снаряжения/эссенций.
@@ -59,35 +122,45 @@ var _sprite: DirectionalSprite3D = null
 
 signal health_changed(current: int, maximum: int)
 signal died()
+signal trust_changed(new_value: int)
 
 func _ready() -> void:
-	add_to_group("player")
+	add_to_group("party")
+	add_to_group("combatants")
 	_sprite = get_node_or_null("Sprite3D") as DirectionalSprite3D
-	_init_race_stats()
+	PartySystem.register_member(self)  # назначает roster_index и control_mode
+	_init_from_roster()
 	AchievementSystem.apply_accumulated_to_player(self)
-	EssenceSystem.resize_to_level(XPSystem.current_level)
 	DungeonPortal.portal_closed.connect(_on_portal_closed)
 	XPSystem.level_up.connect(_on_level_up)
-	EssenceSystem.essence_equipped.connect(_on_essence_changed)
-	EssenceSystem.essence_removed.connect(_on_essence_slot_cleared)
-	EquipmentManager.equipment_changed.connect(_on_equipment_changed)
-	died.connect(GameManager.on_player_died)
+	essence.essence_equipped.connect(_on_essence_changed)
+	essence.essence_removed.connect(_on_essence_slot_cleared)
+	equipment.equipment_changed.connect(_on_equipment_changed)
+	# Демо-раздача статусов «как будто выданных на уровне»: экран состояний и панель HUD
+	# наполняются сразу, до появления реальных источников (аур этажей, эссенций).
+	statuses.grant_demo_statuses()
 
 func _physics_process(delta: float) -> void:
 	if _attack_timer > 0.0:
 		_attack_timer -= delta
+	if _post_switch_invuln_timer > 0.0:
+		_post_switch_invuln_timer = max(0.0, _post_switch_invuln_timer - delta)
 	_tick_passive_regen(delta)
 
 	match state:
 		State.IDLE, State.MOVE:
-			_handle_movement(delta)
-			_handle_attack_input()
-			_handle_block_input()
-			_handle_dodge_input()
-			_handle_consumable_input()
+			if control_mode == ControlMode.HUMAN:
+				_handle_movement(delta)
+				_handle_attack_input()
+				_handle_block_input()
+				_handle_dodge_input()
+				_handle_consumable_input()
+			else:
+				_ai_process(delta)
 		State.ATTACK:
-			_handle_movement(delta)
-			_handle_block_input()
+			if control_mode == ControlMode.HUMAN:
+				_handle_movement(delta)
+				_handle_block_input()
 			_tick_attack_state(delta)
 		State.DODGE:
 			_tick_dodge(delta)
@@ -106,8 +179,9 @@ func _physics_process(delta: float) -> void:
 # ─── Здоровье ──────────────────────────────────────────────────────────────
 
 ## Применяет урон с учётом защиты, блока и i-frames.
-func take_damage(amount: int) -> void:
-	if state == State.DEAD or _is_invincible:
+## [param is_crit] = true рисует число красным и крупнее (крит определяет атакующий).
+func take_damage(amount: int, is_crit: bool = false) -> void:
+	if state == State.DEAD or _is_invincible or _post_switch_invuln_timer > 0.0:
 		return
 	var defense := get_total_stat("defense")
 	var actual_damage: int = max(1, amount - defense)
@@ -118,21 +192,70 @@ func take_damage(amount: int) -> void:
 		actual_damage = int(actual_damage * (1.0 - BLOCK_DAMAGE_REDUCTION))
 	health = max(0, health - actual_damage)
 	health_changed.emit(health, max_health)
+	if actual_damage > 0:
+		_show_combat_text(actual_damage, FloatingCombatText.Kind.HIT_CRIT if is_crit else FloatingCombatText.Kind.HIT)
 	if _sprite != null:
 		_sprite.flash(Color(1.0, 0.2, 0.2))
 	if health == 0:
 		state = State.DEAD
+		# Труп не участвует в бою: иначе Enemy._retarget()/_ai_find_target() будут вечно
+		# выбирать его как ближайшую цель и бить лежачего вместо живых.
+		remove_from_group("combatants")
+		# Затемняем спрайт — тело союзника остаётся в сцене как визуальный труп/маркер лута.
+		if _sprite != null:
+			_sprite.darken_base(0.5, 0.9)
+		_spawn_loot_corpse()
 		died.emit()
 
+## Спавнит рядом с телом контейнер лута, если на павшем есть снаряжение. Контейнер ссылается
+## на эту же equipment-компоненту — «взять» снимает предмет прямо с трупа в общий рюкзак.
+## Незалутанное снаряжение остаётся на союзнике и переживёт возрождение при смене сцены.
+func _spawn_loot_corpse() -> void:
+	if not equipment.has_any_equipped():
+		return
+	var corpse := LootableCorpse.new()
+	corpse.source_player = self
+	corpse.corpse_name = member_name if not member_name.is_empty() else "Павший союзник"
+	# Добавляем отложенно: смерть может наступить внутри физического кадра.
+	get_parent().call_deferred("add_child", corpse)
+	corpse.set_deferred("global_position", global_position)
+
 ## Восстанавливает [param amount] HP, не превышая max_health.
-## [param flash] = false подавляет вспышку (используется пассивной регенерацией).
-func heal(amount: int, flash: bool = true) -> void:
+## [param flash] = false подавляет вспышку и всплывающее число (пассивная регенерация).
+## [param is_crit] форсирует крит; иначе при flash==true крит бросается автоматически.
+func heal(amount: int, flash: bool = true, is_crit: bool = false) -> void:
 	if amount <= 0:
 		return
-	health = min(max_health, health + amount)
+	var crit: bool = is_crit
+	if flash and not crit:
+		crit = CombatMath.roll_crit(self, self)
+	var healed: int = CombatMath.apply_crit(amount) if crit else amount
+	var before: int = health
+	health = min(max_health, health + healed)
 	health_changed.emit(health, max_health)
-	if flash and _sprite != null:
-		_sprite.flash(Color(0.3, 1.0, 0.4))
+	var real_gain: int = health - before
+	if flash:
+		if real_gain > 0:
+			_show_combat_text(real_gain, FloatingCombatText.Kind.HEAL_CRIT if crit else FloatingCombatText.Kind.HEAL)
+		if _sprite != null:
+			_sprite.flash(Color(0.3, 1.0, 0.4))
+
+## Итоговый шанс крита атак/лечения этого участника: база + ловкость + плоские бонусы
+## "crit_chance" (снаряжение/эссенции/модификаторы, трактуются как доли 0.0–1.0).
+func get_attack_crit_chance() -> float:
+	var chance: float = CombatMath.BASE_CRIT_CHANCE
+	chance += float(get_total_stat("agility")) * AGILITY_CRIT_FACTOR
+	chance += _sum_add_modifiers_f("crit_chance")
+	return clampf(chance, 0.0, CombatMath.MAX_CRIT_CHANCE)
+
+## Прибавка к шансу крита атакующего от ослаблений на этом участнике (модификаторы
+## "crit_vulnerability", доля 0.0–1.0) — дебаффы делают персонажа уязвимее к криту.
+func get_incoming_crit_bonus() -> float:
+	return _sum_add_modifiers_f("crit_vulnerability")
+
+## Всплывающее боевое число над персонажем (урон/лечение), см. FloatingCombatText.
+func _show_combat_text(amount: int, kind: int) -> void:
+	FloatingCombatText.spawn(self, global_position + Vector3(0.0, 2.0, 0.0), amount, kind)
 
 ## Раз в REGEN_TICK_INTERVAL секунд восстанавливает HP на величину стата "regen".
 func _tick_passive_regen(delta: float) -> void:
@@ -160,8 +283,8 @@ func get_total_stat(stat_name: String) -> int:
 		"intellect": base_value = base_intellect
 	var pool := float(
 		base_value
-		+ EquipmentManager.get_total_stat(stat_name)
-		+ EssenceSystem.get_total_stat(stat_name)
+		+ equipment.get_total_stat(stat_name)
+		+ essence.get_total_stat(stat_name)
 		+ _sum_add_modifiers(stat_name)
 	)
 	return int(pool * _product_multiply_modifiers(stat_name))
@@ -179,6 +302,20 @@ func remove_modifiers_by_source(source_id: String) -> void:
 			filtered.append(modifier)
 	_modifiers = filtered
 	_recalculate_derived_stats()
+
+## Накладывает статус-эффект (благо/недуг) на этого участника. Вызывается извне —
+## например, врагом при удачной атаке (см. Enemy._on_attack). Подсвечивает спрайт.
+func apply_status_effect(data: StatusEffectData) -> void:
+	if data == null or state == State.DEAD:
+		return
+	statuses.apply_status(data)
+	if _sprite != null:
+		_sprite.flash(Color(0.7, 0.3, 0.9) if data.is_debuff else Color(0.35, 0.55, 1.0))
+
+## Снимает статус-эффект по [param id] (например, при выходе из зоны-ауры). Парный к
+## apply_status_effect; ничего не делает, если такого статуса нет.
+func remove_status_effect(id: String) -> void:
+	statuses.remove_status(id)
 
 ## Накладывает модификатор на [param duration] секунд (0 = бессрочно, снимать вручную).
 ## Подсвечивает спрайт: синим для бафа, фиолетовым для дебафа.
@@ -212,7 +349,7 @@ func _tick_attack_state(delta: float) -> void:
 		state = State.IDLE
 
 func _perform_attack() -> void:
-	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null and weapon.weapon_type == EquipmentData.WeaponType.RANGED:
 		_perform_ranged_attack(weapon)
 	else:
@@ -221,45 +358,58 @@ func _perform_attack() -> void:
 func _perform_melee_attack() -> void:
 	var atk_range := _get_attack_range()
 	var atk_damage := _get_attack_damage()
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(enemy):
+	for target in get_tree().get_nodes_in_group("combatants"):
+		if not _is_hostile_target(target):
 			continue
-		var dist: float = global_position.distance_to(enemy.global_position)
+		var dist: float = global_position.distance_to(target.global_position)
 		if dist > atk_range:
 			continue
 		# Ограничиваем удар передней полусферой (~150°).
-		var dir_to_enemy: Vector3 = enemy.global_position - global_position
-		dir_to_enemy.y = 0.0
-		if dir_to_enemy.length_squared() > 0.001 and _last_move_dir.dot(dir_to_enemy.normalized()) < -0.5:
+		var dir_to_target: Vector3 = target.global_position - global_position
+		dir_to_target.y = 0.0
+		if dir_to_target.length_squared() > 0.001 and _last_move_dir.dot(dir_to_target.normalized()) < -0.5:
 			continue
-		enemy.take_damage(atk_damage)
+		var is_crit: bool = CombatMath.roll_crit(self, target)
+		target.take_damage(CombatMath.apply_crit(atk_damage) if is_crit else atk_damage, is_crit)
 
 func _perform_ranged_attack(weapon: EquipmentData) -> void:
 	# Временная реализация: мгновенный хит ближайшего врага в радиусе.
 	# Заменить на ProjectileComponent когда добавится визуал.
 	var atk_range: float = float(weapon.stat_bonuses.get("range", 10.0))
 	var atk_damage := _get_attack_damage()
-	var nearest_enemy: Node3D = null
+	var nearest_target: Node3D = null
 	var nearest_dist: float = atk_range
-	for enemy in get_tree().get_nodes_in_group("enemies"):
-		if not is_instance_valid(enemy):
+	for target in get_tree().get_nodes_in_group("combatants"):
+		if not _is_hostile_target(target):
 			continue
-		var dist: float = global_position.distance_to(enemy.global_position)
+		var dist: float = global_position.distance_to(target.global_position)
 		if dist < nearest_dist:
 			nearest_dist = dist
-			nearest_enemy = enemy
-	if nearest_enemy != null and nearest_enemy.has_method("take_damage"):
-		nearest_enemy.take_damage(atk_damage)
+			nearest_target = target
+	if nearest_target != null:
+		var is_crit: bool = CombatMath.roll_crit(self, nearest_target)
+		nearest_target.take_damage(CombatMath.apply_crit(atk_damage) if is_crit else atk_damage, is_crit)
+
+## true если [param target] — живой узел из группы "combatants" враждебной по фракции.
+func _is_hostile_target(target: Node) -> bool:
+	if target == self or not is_instance_valid(target):
+		return false
+	if not target.has_method("take_damage") or not ("faction" in target):
+		return false
+	# Трупы участников отряда остаются в сцене — не фиксируемся на них.
+	if "health" in target and target.health <= 0:
+		return false
+	return Faction.is_hostile(faction, target.faction)
 
 func _get_attack_damage() -> int:
-	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null:
 		var weapon_damage: int = weapon.stat_bonuses.get("damage", 0)
 		return weapon_damage + get_total_stat("strength") / 2
 	return max(1, UNARMED_DAMAGE_BASE + get_total_stat("strength") / 3)
 
 func _get_attack_cooldown() -> float:
-	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon == null:
 		return UNARMED_COOLDOWN
 	match weapon.weapon_type:
@@ -269,7 +419,7 @@ func _get_attack_cooldown() -> float:
 	return UNARMED_COOLDOWN
 
 func _get_attack_range() -> float:
-	var weapon := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null:
 		return float(weapon.stat_bonuses.get("range", 1.5))
 	return UNARMED_RANGE
@@ -277,15 +427,27 @@ func _get_attack_range() -> float:
 # ─── Блок ──────────────────────────────────────────────────────────────────
 
 func _handle_block_input() -> void:
+	# В режиме бега мышью ПКМ занята командой «идти сюда», поэтому блок недоступен.
+	if InputSettings.movement_mode == InputSettings.MovementMode.MOUSE:
+		is_blocking = false
+		return
 	is_blocking = _has_shield() and Input.is_action_pressed("block")
 
 func _has_shield() -> bool:
-	var off_hand := EquipmentManager.get_equipped(EquipmentData.Slot.WEAPON_OFF)
+	var off_hand := equipment.get_equipped(EquipmentData.Slot.WEAPON_OFF)
 	return off_hand != null and off_hand.weapon_type == EquipmentData.WeaponType.SHIELD
 
 # ─── Движение и уклонение ──────────────────────────────────────────────────
 
 func _handle_movement(_delta: float) -> void:
+	if InputSettings.movement_mode == InputSettings.MovementMode.MOUSE:
+		_handle_mouse_movement()
+	else:
+		_handle_keyboard_movement()
+
+func _handle_keyboard_movement() -> void:
+	# Клавиатурный ввод отменяет ранее заданную мышью цель (на случай смены режима на лету).
+	_has_move_target = false
 	var input := Input.get_vector("move_left", "move_right", "move_up", "move_down")
 	var direction := Vector3(input.x, 0.0, input.y)
 	if direction.length_squared() > 0.01:
@@ -296,10 +458,55 @@ func _handle_movement(_delta: float) -> void:
 		if state == State.IDLE:
 			state = State.MOVE
 	else:
-		velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
-		velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
-		if state == State.MOVE:
-			state = State.IDLE
+		_stop_horizontal()
+
+## Бег к точке, заданной правой кнопкой мыши. ПКМ проецируется на плоскость земли на
+## высоте персонажа; персонаж бежит к точке, пока не окажется ближе MOVE_STOP_DISTANCE.
+func _handle_mouse_movement() -> void:
+	# "block" привязан к ПКМ — в этом режиме трактуем нажатие как команду «идти сюда».
+	if Input.is_action_just_pressed("block"):
+		var target := _mouse_ground_point()
+		if target != Vector3.INF:
+			_move_target = target
+			_has_move_target = true
+	if not _has_move_target:
+		_stop_horizontal()
+		return
+	var to_target := _move_target - global_position
+	to_target.y = 0.0
+	if to_target.length() <= MOVE_STOP_DISTANCE:
+		_has_move_target = false
+		_stop_horizontal()
+		return
+	var direction := to_target.normalized()
+	_last_move_dir = direction
+	velocity.x = direction.x * MOVE_SPEED
+	velocity.z = direction.z * MOVE_SPEED
+	if state == State.IDLE:
+		state = State.MOVE
+
+## Точка на плоскости земли (y = высота персонажа) под курсором. Vector3.INF если камеры
+## нет или луч не пересёк плоскость.
+func _mouse_ground_point() -> Vector3:
+	var cam := get_viewport().get_camera_3d()
+	if cam == null:
+		return Vector3.INF
+	var mouse_pos := get_viewport().get_mouse_position()
+	var ray_origin := cam.project_ray_origin(mouse_pos)
+	var ray_dir := cam.project_ray_normal(mouse_pos)
+	var ground := Plane(Vector3.UP, global_position.y)
+	var hit = ground.intersects_ray(ray_origin, ray_dir)
+	if hit is Vector3:
+		var point: Vector3 = hit
+		return point
+	return Vector3.INF
+
+## Плавно гасит горизонтальную скорость и возвращает состояние в IDLE.
+func _stop_horizontal() -> void:
+	velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
+	velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
+	if state == State.MOVE:
+		state = State.IDLE
 
 func _handle_dodge_input() -> void:
 	if Input.is_action_just_pressed("dodge"):
@@ -336,32 +543,256 @@ func set_quick_slot(slot_idx: int, item_id: String) -> void:
 		return
 	quick_slots[slot_idx] = item_id
 
+# ─── Управление отрядом (PartySystem) ──────────────────────────────────────
+
+## Переключает режим управления. Вызывается только из PartySystem.
+## HUMAN добавляет узел в группу "player" (её ищут камера, HUD, AbilityManager),
+## AI убирает из неё — при этом персонаж не замирает, а продолжает действовать сам.
+func set_control_mode(mode: ControlMode) -> void:
+	control_mode = mode
+	if mode == ControlMode.HUMAN:
+		if not is_in_group("player"):
+			add_to_group("player")
+	else:
+		_has_move_target = false  # цель бега мышью актуальна только для управляемого игроком
+		if is_in_group("player"):
+			remove_from_group("player")
+
+## Даёт временную неуязвимость после передачи управления, см. _post_switch_invuln_timer.
+func grant_switch_invulnerability(duration: float) -> void:
+	_post_switch_invuln_timer = max(_post_switch_invuln_timer, duration)
+
+# ─── Доверие ────────────────────────────────────────────────────────────────
+
+## Изменяет доверие на [param delta] (клампится в 0..100). При падении до нуля наёмник
+## предаёт отряд или сбегает — решает PartySystem.on_trust_bottomed().
+func modify_trust(delta: int) -> void:
+	if _is_traitor or _is_fleeing:
+		return
+	var old_trust := trust
+	trust = clampi(trust + delta, 0, 100)
+	if trust == old_trust:
+		return
+	trust_changed.emit(trust)
+	if trust == 0:
+		PartySystem.on_trust_bottomed(self)
+
+## Превращает наёмника во врага отряда. Вызывается только из PartySystem после удаления
+## из состава: фракция становится HOSTILE_NPC, и ИИ начинает атаковать бывших товарищей
+## (таргетинг у обеих сторон фракционный). Монстрам предатель не враждебен.
+func turn_traitor() -> void:
+	_is_traitor = true
+	faction = Faction.Kind.HOSTILE_NPC
+	remove_from_group("party")
+	set_control_mode(ControlMode.AI)
+	if _sprite != null:
+		_sprite.set_tint(Color(1.0, 0.45, 0.45))
+
+## Наёмник сбегает с поля боя: перестаёт сражаться, становится NEUTRAL (никто его
+## не атакует), убегает от лидера и исчезает через FLEE_DESPAWN_TIME секунд.
+## Вызывается только из PartySystem после удаления из состава.
+func start_fleeing() -> void:
+	_is_fleeing = true
+	faction = Faction.Kind.NEUTRAL
+	remove_from_group("party")
+	remove_from_group("combatants")
+	set_control_mode(ControlMode.AI)
+	get_tree().create_timer(FLEE_DESPAWN_TIME).timeout.connect(
+		func() -> void:
+			if is_instance_valid(self):
+				queue_free()
+	)
+
+## Ручной вызов способности этого участника (например, из радиального меню компаньона).
+## Пока ничего не вызывает этот метод для не-активных союзников — они используют способности
+## сами через ИИ (задел на будущее, см. trust) — но метод уже полностью рабочий.
+func request_ability_use(slot_index: int) -> bool:
+	return ability_manager.activate_ability(slot_index)
+
+# ─── ИИ-поведение союзников (control_mode == AI) ───────────────────────────
+
+## Раз в это время (сек) переоценивается ближайший враг — не каждый кадр, чтобы не
+## сканировать группу "enemies" 60 раз в секунду на союзника (см. Enemy.RETARGET_INTERVAL).
+const AI_RETARGET_INTERVAL: float = 0.3
+var _ai_retarget_timer: float = 0.0
+var _ai_cached_target: Node3D = null
+
+## Решает, атаковать ближайшую враждебную цель, следовать за лидером или убегать.
+## Сама цель переоценивается раз в AI_RETARGET_INTERVAL, но сближение/атака идут каждый кадр.
+func _ai_process(delta: float) -> void:
+	if _is_fleeing:
+		_ai_flee()
+		return
+	_ai_retarget_timer -= delta
+	if _ai_retarget_timer <= 0.0:
+		_ai_retarget_timer = AI_RETARGET_INTERVAL
+		_ai_cached_target = _ai_find_target()
+	if _ai_cached_target != null and is_instance_valid(_ai_cached_target):
+		_ai_engage(_ai_cached_target)
+	elif PartySystem.members.has(self):
+		_ai_follow_leader()
+	else:
+		# Предатель без цели в радиусе — стоит на месте, за отрядом не ходит.
+		_ai_hold_position()
+
+## Возвращает ближайшую живую враждебную по фракции цель в радиусе AI_ENGAGE_RANGE.
+## Фракционный поиск (не группа "enemies"): у лояльного союзника цели — монстры,
+## у предателя (HOSTILE_NPC) — бывшие товарищи по отряду.
+func _ai_find_target() -> Node3D:
+	var nearest: Node3D = null
+	var nearest_dist: float = AI_ENGAGE_RANGE
+	for candidate in get_tree().get_nodes_in_group("combatants"):
+		if not _is_hostile_target(candidate):
+			continue
+		var dist: float = global_position.distance_to(candidate.global_position)
+		if dist < nearest_dist:
+			nearest_dist = dist
+			nearest = candidate
+	return nearest
+
+## Бежит прочь от лидера отряда, пока таймер FLEE_DESPAWN_TIME не удалит узел.
+func _ai_flee() -> void:
+	var leader := PartySystem.get_active_member()
+	if leader != null:
+		_ai_move_away_from(leader.global_position)
+	else:
+		_ai_hold_position()
+
+## Сближается/держит дистанцию до [param enemy] в зависимости от роли (ближний/дальний бой,
+## определяется типом надетого оружия) и атакует, когда цель в радиусе атаки.
+func _ai_engage(enemy: Node3D) -> void:
+	var atk_range := _get_attack_range()
+	var dist: float = global_position.distance_to(enemy.global_position)
+	var is_ranged := _ai_is_ranged_role()
+	var desired_range: float = atk_range * 0.85 if is_ranged else max(0.5, atk_range * 0.6)
+	if dist > desired_range:
+		_ai_move_toward(enemy.global_position)
+	elif is_ranged and dist < desired_range * 0.5:
+		_ai_move_away_from(enemy.global_position)
+	else:
+		_ai_hold_position()
+	if dist <= atk_range and _attack_timer <= 0.0:
+		_start_attack()
+
+## true если в основной руке дальнобойное оружие — тогда ИИ держит дистанцию вместо сближения.
+func _ai_is_ranged_role() -> bool:
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	return weapon != null and weapon.weapon_type == EquipmentData.WeaponType.RANGED
+
+## Вне боя союзник держится рядом с активным (управляемым игроком) персонажем отряда,
+## со смещением по формации — иначе все союзники сойдутся в одну точку и будут толкаться.
+func _ai_follow_leader() -> void:
+	var leader := PartySystem.get_active_member()
+	if leader == null or leader == self:
+		_ai_hold_position()
+		return
+	var desired_pos: Vector3 = leader.global_position + _ai_formation_offset()
+	var dist: float = global_position.distance_to(desired_pos)
+	if dist <= AI_FOLLOW_DISTANCE:
+		_ai_hold_position()
+		return
+	var speed_scale := 1.6 if dist > AI_FOLLOW_CATCHUP_DISTANCE else 1.0
+	_ai_move_toward(desired_pos, speed_scale)
+
+## Фиксированные смещения от лидера для до 4 союзников (макс. отряд — 5 персонажей).
+const AI_FORMATION_OFFSETS: Array[Vector3] = [
+	Vector3(1.6, 0.0, 1.2),
+	Vector3(-1.6, 0.0, 1.2),
+	Vector3(1.6, 0.0, -1.2),
+	Vector3(-1.6, 0.0, -1.2),
+]
+
+## Возвращает стабильное смещение по порядковому номеру этого союзника среди неактивных
+## участников отряда — каждый союзник держит своё место в формации, а не общую точку.
+func _ai_formation_offset() -> Vector3:
+	var rank := 0
+	for i in PartySystem.members.size():
+		if i == PartySystem.active_index:
+			continue
+		if PartySystem.members[i] == self:
+			return AI_FORMATION_OFFSETS[rank % AI_FORMATION_OFFSETS.size()]
+		rank += 1
+	return Vector3.ZERO
+
+func _ai_move_toward(target_pos: Vector3, speed_scale: float = 1.0) -> void:
+	var dir: Vector3 = target_pos - global_position
+	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		return
+	dir = dir.normalized()
+	_last_move_dir = dir
+	velocity.x = dir.x * MOVE_SPEED * speed_scale
+	velocity.z = dir.z * MOVE_SPEED * speed_scale
+	state = State.MOVE
+
+func _ai_move_away_from(threat_pos: Vector3) -> void:
+	var dir: Vector3 = global_position - threat_pos
+	dir.y = 0.0
+	if dir.length_squared() < 0.01:
+		return
+	dir = dir.normalized()
+	_last_move_dir = -dir  # смотрим на цель, даже отступая от неё
+	velocity.x = dir.x * MOVE_SPEED
+	velocity.z = dir.z * MOVE_SPEED
+	state = State.MOVE
+
+## Гасит горизонтальную скорость до нуля и возвращает состояние в IDLE, когда союзнику
+## некуда идти (цель в комфортной дистанции или лидер рядом).
+func _ai_hold_position() -> void:
+	velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
+	velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
+	if state == State.MOVE and velocity.length_squared() < 0.01:
+		state = State.IDLE
+
 # ─── Инициализация и пересчёт статов ───────────────────────────────────────
 
-func _init_race_stats() -> void:
-	var stats := GameManager.get_race_base_stats(GameManager.player_race)
+## Инициализирует участника из его записи PartySystem.roster: раса, доверие, HP,
+## quick slots, экипировка и эссенции. Числа приводятся через int() — запись могла
+## пройти через JSON (сохранение), где все числа становятся float.
+func _init_from_roster() -> void:
+	var entry := PartySystem.get_roster_entry(roster_index)
+	race = int(entry.get("race", GameManager.player_race))
+	member_name = str(entry.get("name", GameManager.player_name))
+	trust = int(entry.get("trust", 100))
+
+	var stats := GameManager.get_race_base_stats(race as GameManager.Race)
 	base_max_health = stats.get("max_health", 100)
 	base_strength   = stats.get("strength", 10)
 	base_agility    = stats.get("agility", 10)
 	base_intellect  = stats.get("intellect", 10)
+	# Расовый бонус HP за каждый уровень после первого — иначе перезаход в сцену
+	# терял накопленную прибавку (base_max_health рос только по сигналу level_up).
+	var level_bonus := GameManager.get_race_level_bonus(race as GameManager.Race)
+	base_max_health += level_bonus.get("max_health", 0) * (XPSystem.current_level - 1)
 
-	# Восстановить quick_slots из сохранения если есть.
-	# saved_quick_slots не типизирован (может прийти из JSON), поэтому копируем
-	# поэлементно с приведением к String, сохраняя тип quick_slots: Array[String].
-	var saved := GameManager.saved_quick_slots
-	if saved.size() == quick_slots.size():
+	var saved_slots: Array = entry.get("quick_slots", [])
+	if saved_slots.size() == quick_slots.size():
 		for i in range(quick_slots.size()):
-			quick_slots[i] = str(saved[i])
-		GameManager.saved_quick_slots = ["", "", "", ""]
+			quick_slots[i] = str(saved_slots[i])
 
-	# SaveSystem записывает saved_health при загрузке; -1 → старт с полным HP.
-	health = GameManager.saved_health if GameManager.saved_health > 0 else base_max_health
-	GameManager.saved_health = -1
+	var equipment_data: Dictionary = entry.get("equipment", {})
+	if not equipment_data.is_empty():
+		equipment.deserialize(equipment_data)
+
+	essence.bonus_slots = int(entry.get("essence_bonus_slots", 0))
+	essence.resize_to_level(XPSystem.current_level)
+	var essence_paths: Array = entry.get("essences", [])
+	for idx in range(min(essence_paths.size(), essence.slots.size())):
+		var res_path = essence_paths[idx]
+		if res_path != null and ResourceLoader.exists(str(res_path)):
+			essence.slots[idx] = load(str(res_path)) as EssenceData
+	if not essence_paths.is_empty():
+		essence.slots_changed.emit()
+		ability_manager.rebuild_from_slots()
 
 	_recalculate_derived_stats()
+	# health в roster: -1 (или отсутствие записи) = стартовать с полным HP.
+	var saved_health := int(entry.get("health", -1))
+	health = clampi(saved_health if saved_health > 0 else max_health, 1, max_health)
+	health_changed.emit(health, max_health)
 
 func _on_level_up(_new_level: int) -> void:
-	var bonus := GameManager.get_race_level_bonus(GameManager.player_race)
+	var bonus := GameManager.get_race_level_bonus(race as GameManager.Race)
 	base_max_health += bonus.get("max_health", 0)
 	_recalculate_derived_stats()
 
@@ -379,8 +810,8 @@ func _recalculate_derived_stats() -> void:
 	var old_max := max_health
 	var pool := float(
 		base_max_health
-		+ EquipmentManager.get_total_stat("max_health")
-		+ EssenceSystem.get_total_stat("max_health")
+		+ equipment.get_total_stat("max_health")
+		+ essence.get_total_stat("max_health")
 		+ _sum_add_modifiers("max_health")
 	)
 	max_health = max(1, int(pool * _product_multiply_modifiers("max_health")))
@@ -397,6 +828,14 @@ func _sum_add_modifiers(stat_name: String) -> int:
 	for modifier in _modifiers:
 		if modifier.stat == stat_name and modifier.op == StatModifier.Op.ADD:
 			total += int(modifier.value)
+	return total
+
+## То же, что _sum_add_modifiers, но без округления — для дробных статов (шанс крита и т.п.).
+func _sum_add_modifiers_f(stat_name: String) -> float:
+	var total: float = 0.0
+	for modifier in _modifiers:
+		if modifier.stat == stat_name and modifier.op == StatModifier.Op.ADD:
+			total += modifier.value
 	return total
 
 ## Перемножает все MULTIPLY-модификаторы для стата [param stat_name].

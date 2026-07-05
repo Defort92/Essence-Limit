@@ -9,14 +9,6 @@ var player_race: Race = Race.HUMAN
 var player_name: String = ""
 var gold: int = 0
 
-## Временное хранилище HP для восстановления после загрузки сохранения.
-## SaveSystem устанавливает перед сменой сцены; Player читает в _init_race_stats().
-var saved_health: int = -1
-
-## Временное хранилище quick_slots для восстановления после загрузки сохранения.
-## SaveSystem устанавливает перед сменой сцены; Player читает в _ready().
-var saved_quick_slots: Array = ["", "", "", ""]
-
 signal gold_changed(new_amount: int)
 signal new_game_started(race: Race, player_name: String)
 signal player_died()
@@ -45,8 +37,6 @@ func new_game(race: Race, name: String) -> void:
 	player_race = race
 	player_name = name
 	gold = 0
-	saved_health = -1
-	saved_quick_slots = ["", "", "", ""]
 	gold_changed.emit(gold)
 
 	XPSystem.current_xp = 0
@@ -54,24 +44,22 @@ func new_game(race: Race, name: String) -> void:
 	XPSystem.killed_mob_types.clear()
 	XPSystem.bosses_killed_this_run.clear()
 
-	EssenceSystem.slots.clear()
-	EssenceSystem.bonus_slots = 0
-	EssenceSystem.resize_to_level(1)
+	# Состав отряда (включая экипировку/эссенции каждого участника) живёт в PartySystem.roster.
+	# Запись героя создастся заново при регистрации первого Player в новой сцене.
+	PartySystem.reset()
 
 	InventorySystem.clear()
 	StashSystem.clear()
-	EquipmentManager.clear()
-	AbilityManager.clear()
 	RacialPassiveSystem.clear()
 	AchievementSystem.clear()
 
 	new_game_started.emit(race, name)
 
-## Обрабатывает смерть игрока: закрывает портал, испускает сигнал и открывает экран смерти.
-## Вызывается Player при срабатывании сигнала died.
+## Обрабатывает вайп отряда: закрывает портал, испускает сигнал и открывает экран смерти.
+## Вызывается PartySystem, когда погибли все участники. HP восстановится через roster:
+## павшие получают health = -1 (полное HP) при выходе из сцены.
 func on_player_died() -> void:
 	DungeonPortal.close_portal()
-	saved_health = -1  # Полное HP при возрождении
 	player_died.emit()
 	SceneManager.go_to_death_screen()
 

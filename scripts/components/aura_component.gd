@@ -8,6 +8,8 @@ class_name AuraComponent
 @export var modifiers: Array[StatModifier] = []
 ## Как часто (сек) обновлять список существ в зоне. Меньше = точнее, но дороже.
 @export var tick_interval: float = 0.5
+## Несмотря на имя, действует на весь отряд (группа "party"), а не только на активного
+## персонажа — аура этажа должна ощущаться всеми присутствующими союзниками.
 @export var affects_player: bool = true
 @export var affects_enemies: bool = false
 
@@ -48,7 +50,7 @@ func _update_affected() -> void:
 func _gather_candidates() -> Array[Node3D]:
 	var result: Array[Node3D] = []
 	if affects_player:
-		for node in get_tree().get_nodes_in_group("player"):
+		for node in get_tree().get_nodes_in_group("party"):
 			result.append(node as Node3D)
 	if affects_enemies:
 		for node in get_tree().get_nodes_in_group("enemies"):

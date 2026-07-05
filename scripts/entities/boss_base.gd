@@ -12,8 +12,8 @@ var current_phase: int = 0
 
 signal phase_changed(new_phase: int)
 
-func take_damage(amount: int) -> void:
-	super.take_damage(amount)
+func take_damage(amount: int, is_crit: bool = false) -> void:
+	super.take_damage(amount, is_crit)
 	_check_phase_transition()
 
 func _check_phase_transition() -> void:

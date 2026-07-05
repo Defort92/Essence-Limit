@@ -1,59 +1,54 @@
-## Слушает сигнал loot_dropped от всех врагов и спавнит ItemPickup-узлы в текущей сцене.
+## Слушает сигнал loot_dropped от всех врагов и спавнит обыскиваемое тело (LootableCorpse)
+## в текущей сцене на месте гибели. Игрок подходит и обыскивает его по клавише F —
+## золото и предметы забираются через экран лута (см. loot_ui.gd), а не подбираются с земли.
 ## Является Autoload-синглтоном; регистрировать как "LootSpawner" в Project Settings.
-##
-## Золото падает отдельным ItemPickup (gold_amount > 0, item = null).
-## Предметы — по одному ItemPickup на каждый элемент массива items.
-## Все дропы разбрасываются случайно в радиусе SPREAD_RADIUS от позиции гибели.
 extends Node
 
-## Радиус разброса предметов вокруг точки гибели врага (в единицах мира).
-const SPREAD_RADIUS: float = 0.6
-## Смещение по Y — чтобы пикапы не проваливались сквозь пол при спавне.
+## Смещение по Y, чтобы тело не проваливалось сквозь пол.
 const SPAWN_Y_OFFSET: float = 0.1
 
 ## Подписывает врага на систему лута. Вызывается из Enemy._ready().
+## Враг привязан как доп. аргумент — обработчик читает его спрайт для визуального трупа
+## (сигнал испускается синхронно в _die() до queue_free, так что враг ещё валиден).
 func register_enemy(enemy: Enemy) -> void:
-	enemy.loot_dropped.connect(_on_loot_dropped)
+	enemy.loot_dropped.connect(_on_loot_dropped.bind(enemy))
 
 # ─── Внутренняя логика ─────────────────────────────────────────────────────
 
-func _on_loot_dropped(items: Array, gold: int, at_position: Vector3) -> void:
+func _on_loot_dropped(items: Array, gold: int, at_position: Vector3, enemy: Enemy) -> void:
+	if gold <= 0 and items.is_empty():
+		return
 	var parent := _get_spawn_parent()
 	if parent == null:
 		return
 
-	if gold > 0:
-		_spawn_gold(parent, gold, at_position)
+	var corpse := LootableCorpse.new()
+	corpse.loot_gold = gold
+	corpse.loot_items = _aggregate_items(items)
+	corpse.corpse_name = "Останки"
+	if is_instance_valid(enemy):
+		var visual: Dictionary = enemy.get_death_visual()
+		corpse.corpse_texture = visual.texture
+		corpse.corpse_tint = visual.tint
+	parent.add_child(corpse)
+	corpse.global_position = at_position + Vector3(0.0, SPAWN_Y_OFFSET, 0.0)
 
+## Сворачивает список ItemData в записи { "item", "quantity" }, объединяя одинаковые id.
+func _aggregate_items(items: Array) -> Array:
+	var by_id: Dictionary = {}
+	var order: Array = []
 	for item in items:
-		if item is ItemData:
-			_spawn_item(parent, item, at_position)
-
-func _spawn_gold(parent: Node, gold: int, origin: Vector3) -> void:
-	var pickup := ItemPickup.new()
-	pickup.gold_amount = gold
-	_add_with_collision(parent, pickup, origin)
-
-func _spawn_item(parent: Node, item: ItemData, origin: Vector3) -> void:
-	var pickup := ItemPickup.new()
-	pickup.item = item
-	pickup.quantity = 1
-	_add_with_collision(parent, pickup, origin)
-
-## Добавляет ItemPickup в сцену со сферическим коллайдером и случайным смещением.
-func _add_with_collision(parent: Node, pickup: ItemPickup, origin: Vector3) -> void:
-	var col := CollisionShape3D.new()
-	col.shape = SphereShape3D.new()
-	pickup.add_child(col)
-	parent.add_child(pickup)
-	pickup.global_position = origin + _random_offset()
-
-func _random_offset() -> Vector3:
-	return Vector3(
-		randf_range(-SPREAD_RADIUS, SPREAD_RADIUS),
-		SPAWN_Y_OFFSET,
-		randf_range(-SPREAD_RADIUS, SPREAD_RADIUS)
-	)
+		if not (item is ItemData):
+			continue
+		if by_id.has(item.id):
+			by_id[item.id].quantity += 1
+		else:
+			by_id[item.id] = { "item": item, "quantity": 1 }
+			order.append(item.id)
+	var result: Array = []
+	for id in order:
+		result.append(by_id[id])
+	return result
 
 func _get_spawn_parent() -> Node:
 	var tree := Engine.get_main_loop() as SceneTree

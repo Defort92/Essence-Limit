@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="StatusEffectData" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/status_effect_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/stat_modifier.gd" id="2"]
+
+[sub_resource type="Resource" id="mod_def"]
+script = ExtResource("2")
+stat = "defense"
+op = 0
+value = -2.0
+source_id = ""
+
+[resource]
+script = ExtResource("1")
+id = "smoldering"
+display_name = "Тлеющая рана"
+description = "Удар оставил жгучий след. Защита ослаблена, пока рана тлеет."
+glyph = "♨"
+color = Color(0.82, 0.416, 0.29, 1)
+is_debuff = true
+duration = 6.0
+modifiers = [SubResource("mod_def")]

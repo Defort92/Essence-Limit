@@ -21,11 +21,18 @@ class_name DirectionalSprite3D
 var _textures: Array[Texture2D] = []
 var _current_index: int = -1
 
+## Истинный «базовый» цвет спрайта (расовый/монстровый оттенок), к которому возвращается
+## вспышка. Хранится отдельно от modulate, иначе наложение вспышек запоминало бы уже
+## подсвеченный (красный) цвет как базовый — и спрайт «застревал» бы в нём.
+var _base_modulate: Color = Color.WHITE
+var _flash_tween: Tween = null
+
 func _ready() -> void:
 	_textures = [
 		tex_front, tex_front_right, tex_right, tex_rear_right,
 		tex_back, tex_rear_left, tex_left, tex_front_left,
 	]
+	_base_modulate = modulate
 	_apply_index(0)  # Старт лицом к камере.
 
 ## Разворачивает спрайт по направлению взгляда [param world_dir] (X/Z; Y игнорируется).
@@ -46,11 +53,27 @@ func _apply_index(index: int) -> void:
 	if index < _textures.size() and _textures[index] != null:
 		texture = _textures[index]
 
-## Кратко подсвечивает спрайт цветом [param color], затем плавно возвращает
-## тот modulate, что был активен на момент вызова (сохраняет расовый/монстровый оттенок).
-## Используется как дешёвая обратная связь по урону/лечению/бафам без спрайтовых анимаций.
-func flash(color: Color, duration: float = 0.15) -> void:
-	var base_color: Color = modulate
+## Устанавливает базовый оттенок спрайта (расовый/монстровый). Вспышки возвращаются
+## именно к нему. Вызывай вместо прямого присваивания modulate для стойкого цвета.
+func set_tint(color: Color) -> void:
+	_base_modulate = color
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
 	modulate = color
-	var tween := create_tween()
-	tween.tween_property(self, "modulate", base_color, duration)
+
+## Затемняет базовый оттенок на [param amount] (0..1) с заданной [param alpha] —
+## например, для визуального «трупа» павшего союзника.
+func darken_base(amount: float, alpha: float = 1.0) -> void:
+	var c: Color = _base_modulate.darkened(amount)
+	c.a = alpha
+	set_tint(c)
+
+## Кратко подсвечивает спрайт цветом [param color], затем плавно возвращает базовый
+## оттенок (_base_modulate). Прерывает предыдущую вспышку, поэтому серия ударов не
+## оставляет спрайт «застрявшим» в цвете вспышки.
+func flash(color: Color, duration: float = 0.15) -> void:
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	modulate = color
+	_flash_tween = create_tween()
+	_flash_tween.tween_property(self, "modulate", _base_modulate, duration)

@@ -23,21 +23,24 @@ config/icon="res://assets/icon.svg"
 [autoload]
 
 GameManager="*res://scripts/systems/game_manager.gd"
+PartySystem="*res://scripts/systems/party_system.gd"
 XPSystem="*res://scripts/systems/xp_system.gd"
-EssenceSystem="*res://scripts/systems/essence_system.gd"
 DungeonPortal="*res://scripts/systems/dungeon_portal.gd"
 InventorySystem="*res://scripts/systems/inventory_system.gd"
 StashSystem="*res://scripts/systems/stash_system.gd"
-EquipmentManager="*res://scripts/systems/equipment_manager.gd"
 AchievementSystem="*res://scripts/systems/achievement_system.gd"
 RacialPassiveSystem="*res://scripts/systems/racial_passive_system.gd"
-AbilityManager="*res://scripts/systems/ability_manager.gd"
 SceneManager="*res://scripts/systems/scene_manager.gd"
 SaveSystem="*res://scripts/systems/save_system.gd"
+InputSettings="*res://scripts/systems/input_settings.gd"
 PauseManager="*res://scripts/systems/pause_manager.gd"
 LootSpawner="*res://scripts/systems/loot_spawner.gd"
 ShopSystem="*res://scripts/systems/shop_system.gd"
 CraftingSystem="*res://scripts/systems/crafting_system.gd"
+
+[gui]
+
+theme/custom="res://assets/themes/essence_theme.tres"
 
 [input]
 
@@ -95,6 +98,11 @@ inventory={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":73,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
+states={
+"deadzone": 0.5,
+"events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":67,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+]
+}
 ability_1={
 "deadzone": 0.5,
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":81,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
@@ -135,3 +143,7 @@ consumable_4={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":52,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 ]
 }
+
+[rendering]
+
+environment/defaults/default_clear_color=Color(0.043, 0.035, 0.043, 1)

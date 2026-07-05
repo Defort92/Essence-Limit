@@ -1,16 +1,112 @@
 extends CanvasLayer
 
-@onready var hp_bar: ProgressBar = $Control/HPContainer/HPBar
-@onready var hp_text: Label = $Control/HPContainer/HPText
-@onready var gold_label: Label = $Control/GoldLabel
-@onready var level_label: Label = $Control/LevelLabel
+## Как часто (сек) обновляются подписи таймеров статусов в развёрнутой панели.
+const STATUS_TIMER_REFRESH: float = 0.2
+## Сколько секунд «тост» нового статуса живёт в ленте, прежде чем угаснуть.
+const TOAST_LIFETIME: float = 3.0
+## Длительность плавного исчезания тоста.
+const TOAST_FADE: float = 0.4
+## Максимум одновременно видимых тостов в ленте (FIFO — старые вытесняются).
+const MAX_TOASTS: int = 5
+
+const BUFF_ACCENT: Color = Color(0.498, 0.682, 0.384)
+const DEBUFF_ACCENT: Color = Color(0.82, 0.416, 0.29)
+const NAME_COLOR: Color = Color(0.757, 0.675, 0.525)
+const TIMER_COLOR: Color = Color(0.604, 0.545, 0.494)
+## Фон тоста в ленте и фон строки в развёрнутом списке.
+const TOAST_BG: Color = Color(0.039, 0.031, 0.035, 0.82)
+const ROW_BG: Color = Color(0.078, 0.063, 0.055, 0.4)
+
+@onready var hp_bar: ProgressBar = $Control/TopLeft/HPContainer/HPBar
+@onready var hp_text: Label = $Control/TopLeft/HPContainer/HPText
+@onready var _gold_badge: PanelContainer = $Control/GoldBadge
+@onready var _gold_value: Label = $Control/GoldBadge/Row/GoldValue
+@onready var level_label: Label = $Control/TopLeft/LevelLabel
+@onready var _status_panel: PanelContainer = $Control/StatusPanel
+@onready var _header_row: HBoxContainer = $Control/StatusPanel/Root/Header
+@onready var _buff_count: Label = $Control/StatusPanel/Root/Header/BuffCount
+@onready var _debuff_count: Label = $Control/StatusPanel/Root/Header/DebuffCount
+@onready var _chevron: Label = $Control/StatusPanel/Root/Header/Chevron
+@onready var _ticker: VBoxContainer = $Control/StatusPanel/Root/Ticker
+@onready var _expanded_box: VBoxContainer = $Control/StatusPanel/Root/Expanded
+@onready var _status_list: VBoxContainer = $Control/StatusPanel/Root/Expanded/Scroll/StatusList
+@onready var _show_all_btn: Button = $Control/StatusPanel/Root/Expanded/ShowAllButton
+
+## Участник, чьи статусы сейчас показывает панель (обычно активный игрок).
+var _status_member: Player = null
+## Ссылки на подписи таймеров развёрнутого списка для живого отсчёта: [{ label, entry }].
+var _timer_refs: Array[Dictionary] = []
+var _refresh_accum: float = 0.0
+## Развёрнут ли список состояний (false = свёрнутая лента тостов).
+var _expanded: bool = false
+## source_id уже показанных статусов — чтобы тост всплывал только на новое наложение.
+var _seen_ids: Dictionary = {}
+## Активные тосты ленты в порядке появления (FIFO при переполнении MAX_TOASTS).
+var _toast_nodes: Array[Control] = []
+
+## Стиль панели состояний в развёрнутом виде (градиентное затемнение) и свёрнутом
+## (пусто — тосты «висят» на пустом фоне без рамки). Строятся в _ready.
+var _states_style_expanded: StyleBox = null
+var _states_style_collapsed: StyleBox = null
 
 func _ready() -> void:
 	GameManager.gold_changed.connect(_on_gold_changed)
 	_on_gold_changed(GameManager.gold)
 	XPSystem.level_up.connect(_on_level_up)
 	_on_level_up(XPSystem.current_level)
+	PartySystem.active_member_changed.connect(_on_active_member_changed)
+	_header_row.gui_input.connect(_on_header_input)
+	_show_all_btn.pressed.connect(_open_states_modal)
+	_build_badge_styles()
+	_apply_expanded_state()
 	call_deferred("_connect_player")
+
+## Строит градиентные подложки: золото (затемнение к правому краю экрана) и такую же
+## по стилю подложку для развёрнутой панели состояний. Свёрнутая панель — без рамки.
+func _build_badge_styles() -> void:
+	_gold_badge.add_theme_stylebox_override("panel",
+		_make_gradient_stylebox(Color(0.02, 0.015, 0.02, 0.88), 22, 6, 16, 6))
+	_states_style_expanded = _make_gradient_stylebox(Color(0.02, 0.015, 0.02, 0.72), 12, 9, 12, 9)
+	_states_style_collapsed = StyleBoxEmpty.new()
+
+## Подложка с горизонтальным градиентным затемнением: прозрачно слева → [param dark] справа
+## (к краю экрана). Отступы контента задаются аргументами.
+func _make_gradient_stylebox(dark: Color, ml: int, mt: int, mr: int, mb: int) -> StyleBoxTexture:
+	var grad := Gradient.new()
+	grad.set_color(0, Color(dark.r, dark.g, dark.b, 0.0))
+	grad.set_color(1, dark)
+	var tex := GradientTexture2D.new()
+	tex.gradient = grad
+	tex.width = 128
+	tex.height = 8
+	tex.fill_from = Vector2(0.0, 0.0)
+	tex.fill_to = Vector2(1.0, 0.0)
+	var sb := StyleBoxTexture.new()
+	sb.texture = tex
+	sb.content_margin_left = ml
+	sb.content_margin_top = mt
+	sb.content_margin_right = mr
+	sb.content_margin_bottom = mb
+	return sb
+
+func _process(delta: float) -> void:
+	if _timer_refs.is_empty():
+		return
+	_refresh_accum += delta
+	if _refresh_accum < STATUS_TIMER_REFRESH:
+		return
+	_refresh_accum = 0.0
+	for ref in _timer_refs:
+		var label: Label = ref.label
+		var entry: Dictionary = ref.entry
+		label.text = StatusComponent.format_remaining(entry.remaining)
+
+## Клавиша "states" (C) переключает свёрнутую ленту ↔ развёрнутый список. Открытие
+## полного окна — только клик по статусу или «Показать все» (см. _open_states_modal).
+func _unhandled_input(event: InputEvent) -> void:
+	if event.is_action_pressed("states"):
+		_toggle_expanded()
+		get_viewport().set_input_as_handled()
 
 func _connect_player() -> void:
 	var players := get_tree().get_nodes_in_group("player")
@@ -26,11 +122,30 @@ func _on_node_added_to_tree(node: Node) -> void:
 	get_tree().node_added.disconnect(_on_node_added_to_tree)
 	_subscribe_to_player(node as Player)
 
+## При переключении активного участника отряда переподписывается на его health_changed
+## и statuses_changed, чтобы HUD всегда показывал того, кем сейчас управляет игрок.
+func _on_active_member_changed(old_member: Player, new_member: Player) -> void:
+	if old_member != null and old_member.health_changed.is_connected(_on_health_changed):
+		old_member.health_changed.disconnect(_on_health_changed)
+	if old_member != null and old_member.statuses.statuses_changed.is_connected(_on_statuses_changed):
+		old_member.statuses.statuses_changed.disconnect(_on_statuses_changed)
+	# Новый участник — своя лента: сбрасываем «виденные» статусы и очищаем тосты.
+	_seen_ids.clear()
+	_clear_ticker()
+	_subscribe_to_player(new_member)
+
 func _subscribe_to_player(player: Player) -> void:
 	if player == null:
 		return
-	player.health_changed.connect(_on_health_changed)
+	if not player.health_changed.is_connected(_on_health_changed):
+		player.health_changed.connect(_on_health_changed)
 	_on_health_changed(player.health, player.max_health)
+	_status_member = player
+	if not player.statuses.statuses_changed.is_connected(_on_statuses_changed):
+		player.statuses.statuses_changed.connect(_on_statuses_changed)
+	# Первичное наполнение считаем «уже виденным», чтобы стартовые статусы не сыпались тостами.
+	_seed_seen_ids()
+	_on_statuses_changed()
 
 func _on_health_changed(current: int, maximum: int) -> void:
 	hp_bar.max_value = maximum
@@ -38,7 +153,205 @@ func _on_health_changed(current: int, maximum: int) -> void:
 	hp_text.text = "%d / %d" % [current, maximum]
 
 func _on_gold_changed(amount: int) -> void:
-	gold_label.text = "Золото: %d" % amount
+	_gold_value.text = "%d" % amount
 
 func _on_level_up(new_level: int) -> void:
 	level_label.text = "Ур. %d" % new_level
+
+# ─── Панель состояний ────────────────────────────────────────────────────────
+
+## Обновляет счётчики в шапке, всплывает тосты для новых статусов (в свёрнутом режиме)
+## и пересобирает развёрнутый список, если он открыт. Вызывается по statuses_changed.
+func _on_statuses_changed() -> void:
+	if _status_member == null:
+		return
+	var buffs: Array[Dictionary] = _status_member.statuses.get_buffs()
+	var debuffs: Array[Dictionary] = _status_member.statuses.get_debuffs()
+	# Итоговое кол-во положительных/отрицательных состояний видно всегда, даже свёрнуто.
+	_buff_count.text = "▲ %d" % buffs.size()
+	_debuff_count.text = "▼ %d" % debuffs.size()
+
+	_process_new_toasts(buffs, debuffs)
+
+	if _expanded:
+		_rebuild_expanded_list(buffs, debuffs)
+
+## Всплывает тост для каждого статуса, чьего source_id мы ещё не видели, и обновляет
+## множество «виденных» под текущий состав (снятые статусы уходят из него).
+func _process_new_toasts(buffs: Array[Dictionary], debuffs: Array[Dictionary]) -> void:
+	var current: Dictionary = {}
+	for entry in buffs:
+		current[entry.source_id] = true
+		if not _seen_ids.has(entry.source_id) and not _expanded:
+			_spawn_toast(entry, BUFF_ACCENT)
+	for entry in debuffs:
+		current[entry.source_id] = true
+		if not _seen_ids.has(entry.source_id) and not _expanded:
+			_spawn_toast(entry, DEBUFF_ACCENT)
+	_seen_ids = current
+
+## Помечает все текущие статусы как «виденные» без всплытия тостов (стартовое наполнение).
+func _seed_seen_ids() -> void:
+	_seen_ids.clear()
+	if _status_member == null:
+		return
+	for entry in _status_member.statuses.get_buffs():
+		_seen_ids[entry.source_id] = true
+	for entry in _status_member.statuses.get_debuffs():
+		_seen_ids[entry.source_id] = true
+
+func _spawn_toast(entry: Dictionary, accent: Color) -> void:
+	var card := _make_status_card(entry, accent, TOAST_BG, false)
+	card.gui_input.connect(_on_card_input)
+	_ticker.add_child(card)
+	_toast_nodes.append(card)
+	# Живёт TOAST_LIFETIME, затем плавно гаснет и удаляется. Твин привязан к самой
+	# карточке: если её удалят раньше, твин авто-остановится.
+	var life := card.create_tween()
+	life.tween_interval(TOAST_LIFETIME)
+	life.tween_property(card, "modulate:a", 0.0, TOAST_FADE)
+	life.tween_callback(_remove_toast.bind(card))
+	card.set_meta("life_tween", life)
+	# FIFO: не больше MAX_TOASTS — лишние старые затираются анимацией удаления.
+	while _toast_nodes.size() > MAX_TOASTS:
+		_evict_toast(_toast_nodes.pop_front())
+
+## Обычное истечение времени жизни тоста: убрать из учёта и удалить узел.
+func _remove_toast(card: Control) -> void:
+	_toast_nodes.erase(card)
+	if is_instance_valid(card):
+		card.queue_free()
+
+## Досрочное вытеснение самого старого тоста при переполнении: короткая анимация
+## удаления (быстрое угасание), затем узел освобождается.
+func _evict_toast(card: Control) -> void:
+	if not is_instance_valid(card):
+		return
+	if card.has_meta("life_tween"):
+		var t: Tween = card.get_meta("life_tween")
+		if t != null and t.is_valid():
+			t.kill()
+	var out := card.create_tween()
+	out.tween_property(card, "modulate:a", 0.0, 0.15)
+	out.tween_callback(card.queue_free)
+
+func _toggle_expanded() -> void:
+	_expanded = not _expanded
+	_apply_expanded_state()
+
+## Приводит панель к текущему режиму: свёрнуто — лента тостов на пустом фоне (без рамки);
+## развёрнуто — список со скроллом и кнопкой «Показать все» на градиентной подложке.
+func _apply_expanded_state() -> void:
+	_chevron.text = "⌃" if _expanded else "⌄"
+	_ticker.visible = not _expanded
+	_expanded_box.visible = _expanded
+	_status_panel.add_theme_stylebox_override("panel",
+		_states_style_expanded if _expanded else _states_style_collapsed)
+	if _expanded:
+		_clear_ticker()
+		_rebuild_expanded_list()
+	else:
+		_clear_expanded_list()
+
+## Пересобирает развёрнутый список. Аргументы опциональны — если не переданы, берутся
+## актуальные из компонента статусов участника.
+func _rebuild_expanded_list(buffs: Array[Dictionary] = [], debuffs: Array[Dictionary] = []) -> void:
+	_clear_expanded_list()
+	if _status_member == null:
+		return
+	if buffs.is_empty() and debuffs.is_empty():
+		buffs = _status_member.statuses.get_buffs()
+		debuffs = _status_member.statuses.get_debuffs()
+	if buffs.is_empty() and debuffs.is_empty():
+		var empty := Label.new()
+		empty.text = "Активных состояний нет."
+		empty.add_theme_color_override("font_color", TIMER_COLOR)
+		empty.add_theme_font_size_override("font_size", 13)
+		_status_list.add_child(empty)
+		return
+	for entry in buffs:
+		_add_expanded_row(entry, BUFF_ACCENT)
+	for entry in debuffs:
+		_add_expanded_row(entry, DEBUFF_ACCENT)
+
+func _add_expanded_row(entry: Dictionary, accent: Color) -> void:
+	var card := _make_status_card(entry, accent, ROW_BG, true)
+	card.gui_input.connect(_on_card_input)
+	_status_list.add_child(card)
+
+## Клик по тосту или строке списка — открыть полное окно состояний (с паузой и блюром).
+func _on_card_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed:
+		_open_states_modal()
+
+func _open_states_modal() -> void:
+	var modal := get_tree().get_first_node_in_group("states_screen")
+	if modal != null and modal.has_method("open"):
+		modal.open()
+
+func _clear_ticker() -> void:
+	for child in _ticker.get_children():
+		child.queue_free()
+	_toast_nodes.clear()
+
+func _clear_expanded_list() -> void:
+	for child in _status_list.get_children():
+		child.queue_free()
+	_timer_refs.clear()
+
+## Строит строку статуса: цветная левая грань (accent), глиф, имя и таймер на фоне bg.
+## Дети получают mouse_filter=IGNORE, чтобы клик по всей карточке ловил её PanelContainer.
+## [param track_timer] = true регистрирует таймер в _timer_refs для живого отсчёта.
+func _make_status_card(entry: Dictionary, accent: Color, bg: Color, track_timer: bool) -> PanelContainer:
+	var data: StatusEffectData = entry.data
+	var card := PanelContainer.new()
+	card.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	card.add_theme_stylebox_override("panel", _make_card_style(accent, bg))
+
+	var row := HBoxContainer.new()
+	row.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	row.add_theme_constant_override("separation", 9)
+
+	var glyph := Label.new()
+	glyph.text = data.glyph
+	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	glyph.custom_minimum_size = Vector2(18, 0)
+	glyph.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	glyph.add_theme_color_override("font_color", data.color)
+	glyph.add_theme_font_size_override("font_size", 16)
+	row.add_child(glyph)
+
+	var name_label := Label.new()
+	name_label.text = data.display_name
+	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	name_label.add_theme_color_override("font_color", NAME_COLOR)
+	name_label.add_theme_font_size_override("font_size", 14)
+	row.add_child(name_label)
+
+	var timer_label := Label.new()
+	timer_label.text = StatusComponent.format_remaining(entry.remaining)
+	timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	timer_label.add_theme_color_override("font_color", TIMER_COLOR)
+	timer_label.add_theme_font_size_override("font_size", 13)
+	row.add_child(timer_label)
+	if track_timer:
+		_timer_refs.append({"label": timer_label, "entry": entry})
+
+	card.add_child(row)
+	return card
+
+func _make_card_style(accent: Color, bg: Color) -> StyleBoxFlat:
+	var style := StyleBoxFlat.new()
+	style.bg_color = bg
+	style.border_width_left = 3
+	style.border_color = accent
+	style.content_margin_left = 9
+	style.content_margin_top = 6
+	style.content_margin_right = 10
+	style.content_margin_bottom = 6
+	return style
+
+func _on_header_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_toggle_expanded()

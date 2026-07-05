@@ -30,4 +30,7 @@ func serialize() -> Array:
 	return _unlocked.duplicate()
 
 func deserialize(data: Array) -> void:
-	_unlocked = data.duplicate()
+	# data приходит из JSON нетипизированным — прямое присваивание в Array[String] падает.
+	_unlocked.clear()
+	for passive_id in data:
+		_unlocked.append(str(passive_id))

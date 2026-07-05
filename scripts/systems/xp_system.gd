@@ -1,6 +1,7 @@
-## Система опыта и уровней.
+## Система опыта и уровней. Уровень общий на весь отряд (первое убийство типа моба
+## засчитывается всем), но слот эссенции открывается у каждого участника отдельно.
 ## XP начисляется только за первое убийство каждого типа моба (killed_mob_types).
-## Уровень открывает новый слот эссенции через EssenceSystem.resize_to_level().
+## Уровень открывает новый слот эссенции через essence.resize_to_level() каждого участника.
 ## Является Autoload-синглтоном; регистрировать как "XPSystem" в Project Settings.
 extends Node
 
@@ -45,18 +46,18 @@ func reduce_level(amount: int) -> void:
 	if new_level == current_level:
 		return
 	current_level = new_level
-	EssenceSystem.resize_to_level(current_level)
+	_resize_all_essences()
 	level_down.emit(current_level)
 
 ## Восстанавливает уровень после временного снижения.
 ## Пересчитывает фактический уровень по накопленному XP — никаких дублей слотов не будет,
-## потому что EssenceSystem.resize_to_level не создаёт лишних слотов если они уже есть.
+## потому что essence.resize_to_level не создаёт лишних слотов если они уже есть.
 func restore_level() -> void:
 	var correct_level := _calculate_level_from_xp()
 	if correct_level == current_level:
 		return
 	current_level = correct_level
-	EssenceSystem.resize_to_level(current_level)
+	_resize_all_essences()
 	level_up.emit(current_level)
 
 ## Сбрасывает счётчик убийств боссов. Вызывать при каждом открытии портала.
@@ -79,8 +80,14 @@ func _add_xp(amount: int) -> void:
 func _check_level_up() -> void:
 	while current_level < MAX_LEVEL and current_xp >= _xp_for_level(current_level + 1):
 		current_level += 1
-		EssenceSystem.resize_to_level(current_level)
+		_resize_all_essences()
 		level_up.emit(current_level)
+
+## Применяет текущий уровень к слотам эссенций каждого участника отряда — у каждого
+## своя essence-компонента, общего EssenceSystem больше нет.
+func _resize_all_essences() -> void:
+	for member in PartySystem.members:
+		member.essence.resize_to_level(current_level)
 
 ## Вычисляет фактический уровень по накопленному XP без изменения состояния.
 func _calculate_level_from_xp() -> int:

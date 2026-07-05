@@ -1,0 +1,276 @@
+[gd_resource type="Theme" load_steps=25 format=3]
+
+[ext_resource type="FontFile" path="res://assets/fonts/CormorantGaramond.ttf" id="1_cormorant"]
+[ext_resource type="FontFile" path="res://assets/fonts/CormorantGaramond-Italic.ttf" id="2_cormorant_it"]
+[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="3_forum"]
+
+[sub_resource type="FontVariation" id="fv_forum"]
+base_font = ExtResource("3_forum")
+spacing_glyph = 2
+
+[sub_resource type="FontVariation" id="fv_forum_header"]
+base_font = ExtResource("3_forum")
+spacing_glyph = 3
+
+[sub_resource type="FontVariation" id="fv_forum_title"]
+base_font = ExtResource("3_forum")
+spacing_glyph = 8
+
+[sub_resource type="FontVariation" id="fv_cormorant_italic"]
+base_font = ExtResource("2_cormorant_it")
+
+[sub_resource type="StyleBoxFlat" id="sb_panel"]
+bg_color = Color(0.078, 0.063, 0.059, 0.97)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.45)
+shadow_color = Color(0, 0, 0, 0.6)
+shadow_size = 20
+content_margin_left = 34
+content_margin_top = 28
+content_margin_right = 34
+content_margin_bottom = 28
+
+[sub_resource type="StyleBoxFlat" id="sb_btn_normal"]
+bg_color = Color(0.471, 0.235, 0.118, 0.12)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.4)
+content_margin_left = 24
+content_margin_top = 10
+content_margin_right = 24
+content_margin_bottom = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_btn_hover"]
+bg_color = Color(0.588, 0.275, 0.141, 0.28)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.55, 0.44, 0.25, 0.55)
+content_margin_left = 24
+content_margin_top = 10
+content_margin_right = 24
+content_margin_bottom = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_btn_pressed"]
+bg_color = Color(0.353, 0.165, 0.086, 0.35)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.706, 0.235, 0.157, 0.6)
+content_margin_left = 24
+content_margin_top = 10
+content_margin_right = 24
+content_margin_bottom = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_btn_disabled"]
+bg_color = Color(0.02, 0.016, 0.016, 0.4)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.29, 0.235, 0.157, 0.3)
+content_margin_left = 24
+content_margin_top = 10
+content_margin_right = 24
+content_margin_bottom = 10
+
+[sub_resource type="StyleBoxFlat" id="sb_btn_focus"]
+draw_center = false
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.839, 0.698, 0.353, 0.55)
+
+[sub_resource type="StyleBoxFlat" id="sb_menu_btn_normal"]
+bg_color = Color(0, 0, 0, 0)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.16)
+content_margin_left = 16
+content_margin_top = 13
+content_margin_right = 18
+content_margin_bottom = 13
+
+[sub_resource type="StyleBoxFlat" id="sb_menu_btn_hover"]
+bg_color = Color(0.588, 0.275, 0.141, 0.2)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.28)
+content_margin_left = 26
+content_margin_top = 13
+content_margin_right = 18
+content_margin_bottom = 13
+
+[sub_resource type="StyleBoxFlat" id="sb_menu_btn_pressed"]
+bg_color = Color(0.353, 0.165, 0.086, 0.3)
+border_width_top = 1
+border_width_bottom = 1
+border_color = Color(0.706, 0.235, 0.157, 0.4)
+content_margin_left = 26
+content_margin_top = 13
+content_margin_right = 18
+content_margin_bottom = 13
+
+[sub_resource type="StyleBoxFlat" id="sb_accent_btn_normal"]
+bg_color = Color(0.588, 0.196, 0.118, 0.3)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.706, 0.235, 0.157, 0.6)
+content_margin_left = 30
+content_margin_top = 11
+content_margin_right = 30
+content_margin_bottom = 11
+
+[sub_resource type="StyleBoxFlat" id="sb_accent_btn_hover"]
+bg_color = Color(0.66, 0.24, 0.13, 0.42)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.78, 0.3, 0.19, 0.75)
+content_margin_left = 30
+content_margin_top = 11
+content_margin_right = 30
+content_margin_bottom = 11
+
+[sub_resource type="StyleBoxFlat" id="sb_lineedit_normal"]
+bg_color = Color(0.031, 0.024, 0.027, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.5)
+content_margin_left = 14
+content_margin_top = 8
+content_margin_right = 14
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="sb_lineedit_focus"]
+bg_color = Color(0.031, 0.024, 0.027, 0.9)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.839, 0.698, 0.353, 0.6)
+content_margin_left = 14
+content_margin_top = 8
+content_margin_right = 14
+content_margin_bottom = 8
+
+[sub_resource type="StyleBoxFlat" id="sb_progress_bg"]
+bg_color = Color(0.102, 0.039, 0.035, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.157, 0.118, 0.6)
+
+[sub_resource type="StyleBoxFlat" id="sb_progress_fill"]
+bg_color = Color(0.722, 0.157, 0.11, 1)
+
+[sub_resource type="StyleBoxFlat" id="sb_slider_track"]
+bg_color = Color(0.11, 0.086, 0.078, 1)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.35)
+content_margin_top = 3
+content_margin_bottom = 3
+
+[sub_resource type="StyleBoxFlat" id="sb_slider_fill"]
+bg_color = Color(0.69, 0.48, 0.23, 1)
+content_margin_top = 3
+content_margin_bottom = 3
+
+[sub_resource type="StyleBoxFlat" id="sb_scroll_track"]
+bg_color = Color(0, 0, 0, 0.3)
+
+[sub_resource type="StyleBoxFlat" id="sb_scroll_grabber"]
+bg_color = Color(0.471, 0.376, 0.212, 0.4)
+
+[resource]
+default_font = ExtResource("1_cormorant")
+default_font_size = 17
+AccentButton/base_type = &"Button"
+AccentButton/colors/font_color = Color(0.941, 0.812, 0.49, 1)
+AccentButton/colors/font_hover_color = Color(1, 0.89, 0.62, 1)
+AccentButton/colors/font_pressed_color = Color(0.941, 0.812, 0.49, 1)
+AccentButton/colors/font_focus_color = Color(1, 0.89, 0.62, 1)
+AccentButton/styles/normal = SubResource("sb_accent_btn_normal")
+AccentButton/styles/hover = SubResource("sb_accent_btn_hover")
+AccentButton/styles/pressed = SubResource("sb_accent_btn_normal")
+AccentButton/styles/focus = SubResource("sb_btn_focus")
+Button/colors/font_color = Color(0.78, 0.71, 0.6, 1)
+Button/colors/font_hover_color = Color(0.941, 0.812, 0.49, 1)
+Button/colors/font_pressed_color = Color(0.941, 0.812, 0.49, 1)
+Button/colors/font_focus_color = Color(0.941, 0.812, 0.49, 1)
+Button/colors/font_disabled_color = Color(0.373, 0.337, 0.298, 0.8)
+Button/fonts/font = SubResource("fv_forum")
+Button/font_sizes/font_size = 19
+Button/styles/normal = SubResource("sb_btn_normal")
+Button/styles/hover = SubResource("sb_btn_hover")
+Button/styles/pressed = SubResource("sb_btn_pressed")
+Button/styles/disabled = SubResource("sb_btn_disabled")
+Button/styles/focus = SubResource("sb_btn_focus")
+CheckBox/colors/font_color = Color(0.78, 0.71, 0.6, 1)
+CheckBox/colors/font_hover_color = Color(0.941, 0.812, 0.49, 1)
+DimLabel/base_type = &"Label"
+DimLabel/colors/font_color = Color(0.49, 0.447, 0.408, 1)
+DimLabel/font_sizes/font_size = 15
+HSlider/styles/slider = SubResource("sb_slider_track")
+HSlider/styles/grabber_area = SubResource("sb_slider_fill")
+HSlider/styles/grabber_area_highlight = SubResource("sb_slider_fill")
+HeaderLabel/base_type = &"Label"
+HeaderLabel/colors/font_color = Color(0.541, 0.49, 0.42, 1)
+HeaderLabel/fonts/font = SubResource("fv_forum_header")
+HeaderLabel/font_sizes/font_size = 15
+Label/colors/font_color = Color(0.78, 0.71, 0.6, 1)
+LineEdit/colors/font_color = Color(0.78, 0.71, 0.6, 1)
+LineEdit/colors/font_placeholder_color = Color(0.435, 0.392, 0.349, 1)
+LineEdit/colors/caret_color = Color(0.839, 0.635, 0.306, 1)
+LineEdit/fonts/font = SubResource("fv_forum")
+LineEdit/font_sizes/font_size = 19
+LineEdit/styles/normal = SubResource("sb_lineedit_normal")
+LineEdit/styles/focus = SubResource("sb_lineedit_focus")
+MenuItemButton/base_type = &"Button"
+MenuItemButton/colors/font_color = Color(0.839, 0.698, 0.353, 1)
+MenuItemButton/colors/font_hover_color = Color(0.941, 0.812, 0.49, 1)
+MenuItemButton/colors/font_pressed_color = Color(0.941, 0.812, 0.49, 1)
+MenuItemButton/colors/font_focus_color = Color(0.941, 0.812, 0.49, 1)
+MenuItemButton/colors/font_disabled_color = Color(0.373, 0.337, 0.298, 0.8)
+MenuItemButton/font_sizes/font_size = 22
+MenuItemButton/styles/normal = SubResource("sb_menu_btn_normal")
+MenuItemButton/styles/hover = SubResource("sb_menu_btn_hover")
+MenuItemButton/styles/pressed = SubResource("sb_menu_btn_pressed")
+MenuItemButton/styles/disabled = SubResource("sb_menu_btn_normal")
+MenuItemButton/styles/focus = SubResource("sb_menu_btn_hover")
+MutedLabel/base_type = &"Label"
+MutedLabel/colors/font_color = Color(0.604, 0.545, 0.494, 1)
+MutedLabel/fonts/font = SubResource("fv_cormorant_italic")
+MutedLabel/font_sizes/font_size = 17
+Panel/styles/panel = SubResource("sb_panel")
+PanelContainer/styles/panel = SubResource("sb_panel")
+ProgressBar/styles/background = SubResource("sb_progress_bg")
+ProgressBar/styles/fill = SubResource("sb_progress_fill")
+TitleLabel/base_type = &"Label"
+TitleLabel/colors/font_color = Color(0.839, 0.698, 0.353, 1)
+TitleLabel/colors/font_shadow_color = Color(0, 0, 0, 0.9)
+TitleLabel/constants/shadow_offset_x = 0
+TitleLabel/constants/shadow_offset_y = 2
+TitleLabel/fonts/font = SubResource("fv_forum_title")
+TitleLabel/font_sizes/font_size = 40
+VScrollBar/styles/grabber = SubResource("sb_scroll_grabber")
+VScrollBar/styles/grabber_highlight = SubResource("sb_scroll_grabber")
+VScrollBar/styles/grabber_pressed = SubResource("sb_scroll_grabber")
+VScrollBar/styles/scroll = SubResource("sb_scroll_track")

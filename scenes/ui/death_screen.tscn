@@ -1,0 +1,191 @@
+[gd_scene load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/death_screen.gd" id="1_script"]
+[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+
+[sub_resource type="Gradient" id="Gradient_bg"]
+offsets = PackedFloat32Array(0, 0.55, 1)
+colors = PackedColorArray(0.165, 0.039, 0.035, 1, 0.071, 0.016, 0.016, 1, 0.024, 0.008, 0.008, 1)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_bg"]
+gradient = SubResource("Gradient_bg")
+width = 512
+height = 512
+fill = 1
+fill_from = Vector2(0.5, 0.42)
+fill_to = Vector2(1.1, 0.42)
+
+[sub_resource type="Gradient" id="Gradient_glow"]
+offsets = PackedFloat32Array(0, 0.62)
+colors = PackedColorArray(0.588, 0.078, 0.055, 0.34, 0, 0, 0, 0)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_glow"]
+gradient = SubResource("Gradient_glow")
+width = 512
+height = 512
+fill = 1
+fill_from = Vector2(0.5, 0.5)
+fill_to = Vector2(1, 0.5)
+
+[sub_resource type="Gradient" id="Gradient_vignette"]
+offsets = PackedFloat32Array(0.3, 0.82, 1)
+colors = PackedColorArray(0, 0, 0, 0, 0, 0, 0, 0.5, 0, 0, 0, 0.8)
+
+[sub_resource type="GradientTexture2D" id="GradientTexture2D_vignette"]
+gradient = SubResource("Gradient_vignette")
+width = 512
+height = 512
+fill = 1
+fill_from = Vector2(0.5, 0.44)
+fill_to = Vector2(1.1, 0.44)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sigil"]
+draw_center = false
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.706, 0.196, 0.141, 0.6)
+
+[sub_resource type="FontVariation" id="FontVariation_title"]
+base_font = ExtResource("2_forum")
+spacing_glyph = 20
+
+[node name="DeathScreen" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_script")
+
+[node name="Background" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture2D_bg")
+expand_mode = 1
+
+[node name="Glow" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_left = 0.5
+anchor_top = 0.44
+anchor_right = 0.5
+anchor_bottom = 0.44
+offset_left = -280.0
+offset_top = -280.0
+offset_right = 280.0
+offset_bottom = 280.0
+texture = SubResource("GradientTexture2D_glow")
+expand_mode = 1
+
+[node name="Vignette" type="TextureRect" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+texture = SubResource("GradientTexture2D_vignette")
+expand_mode = 1
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="SigilSlot" type="CenterContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Sigil" type="Control" parent="CenterContainer/VBoxContainer/SigilSlot"]
+custom_minimum_size = Vector2(70, 70)
+layout_mode = 2
+
+[node name="Square" type="Panel" parent="CenterContainer/VBoxContainer/SigilSlot/Sigil"]
+layout_mode = 0
+offset_right = 70.0
+offset_bottom = 70.0
+rotation = 0.785398
+pivot_offset = Vector2(35, 35)
+theme_override_styles/panel = SubResource("StyleBoxFlat_sigil")
+
+[node name="Crack" type="ColorRect" parent="CenterContainer/VBoxContainer/SigilSlot/Sigil"]
+layout_mode = 0
+offset_left = 34.0
+offset_top = -6.0
+offset_right = 36.0
+offset_bottom = 76.0
+rotation = 0.14
+pivot_offset = Vector2(1, 41)
+color = Color(0.039, 0.012, 0.012, 1)
+
+[node name="SigilSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_colors/font_color = Color(0.659, 0.141, 0.102, 1)
+theme_override_fonts/font = SubResource("FontVariation_title")
+theme_override_font_sizes/font_size = 64
+text = "ВЫ ПАЛИ"
+horizontal_alignment = 1
+
+[node name="DividerSlot" type="CenterContainer" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+
+[node name="Divider" type="ColorRect" parent="CenterContainer/VBoxContainer/DividerSlot"]
+custom_minimum_size = Vector2(180, 1)
+layout_mode = 2
+color = Color(0.588, 0.157, 0.118, 0.8)
+
+[node name="DividerSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 28)
+layout_mode = 2
+
+[node name="SubtitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_colors/font_color = Color(0.604, 0.522, 0.471, 1)
+theme_override_font_sizes/font_size = 19
+text = "Подземелье забирает тех, кто не был готов. Портал сомкнулся — и вас вынесло к вратам города."
+horizontal_alignment = 1
+autowrap_mode = 2
+
+[node name="ButtonSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 48)
+layout_mode = 2
+
+[node name="ReturnButton" type="Button" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_type_variation = &"AccentButton"
+theme_override_font_sizes/font_size = 20
+text = "Вернуться в город"
+
+[node name="FootnoteSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
+custom_minimum_size = Vector2(0, 16)
+layout_mode = 2
+
+[node name="FootnoteLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+theme_override_colors/font_color = Color(0.435, 0.373, 0.337, 1)
+text = "Портал вновь откроется в новолуние"
+horizontal_alignment = 1
+
+[connection signal="pressed" from="CenterContainer/VBoxContainer/ReturnButton" to="." method="_on_return_pressed"]

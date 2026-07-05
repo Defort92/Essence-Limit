@@ -1,6 +1,42 @@
-[gd_scene format=3 uid="uid://bhu1a2b3c4d5e"]
+[gd_scene load_steps=7 format=3 uid="uid://bhu1a2b3c4d5e"]
 
-[ext_resource type="Script" uid="uid://chu1a2b3c4d5f" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="Script" uid="uid://d26o58g35wyae" path="res://scripts/ui/hud.gd" id="1_hud"]
+[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+
+[sub_resource type="FontVariation" id="FontVariation_hud"]
+base_font = ExtResource("2_forum")
+spacing_glyph = 1
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gold_badge"]
+bg_color = Color(0.031, 0.024, 0.027, 0.7)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.4)
+content_margin_left = 14
+content_margin_top = 6
+content_margin_right = 14
+content_margin_bottom = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_level_badge"]
+bg_color = Color(0.031, 0.024, 0.027, 0.7)
+border_width_left = 1
+border_width_top = 1
+border_width_right = 1
+border_width_bottom = 1
+border_color = Color(0.471, 0.376, 0.212, 0.4)
+content_margin_left = 12
+content_margin_top = 4
+content_margin_right = 12
+content_margin_bottom = 4
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_status_panel"]
+bg_color = Color(0.02, 0.015, 0.02, 0.32)
+content_margin_left = 12
+content_margin_top = 9
+content_margin_right = 12
+content_margin_bottom = 9
 
 [node name="HUD" type="CanvasLayer"]
 script = ExtResource("1_hud")
@@ -13,52 +49,167 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="HPContainer" type="HBoxContainer" parent="Control"]
+[node name="TopLeft" type="VBoxContainer" parent="Control"]
 layout_mode = 1
-anchor_right = 0.0
-anchor_bottom = 0.0
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 310.0
-offset_bottom = 36.0
+offset_left = 22.0
+offset_top = 22.0
+offset_right = 322.0
+offset_bottom = 80.0
+theme_override_constants/separation = 7
 
-[node name="HPLabel" type="Label" parent="Control/HPContainer"]
+[node name="LevelLabel" type="Label" parent="Control/TopLeft"]
 layout_mode = 2
-text = "HP"
-vertical_alignment = 1
+size_flags_horizontal = 0
+theme_override_colors/font_color = Color(0.78, 0.71, 0.6, 1)
+theme_override_fonts/font = SubResource("FontVariation_hud")
+theme_override_font_sizes/font_size = 17
+theme_override_styles/normal = SubResource("StyleBoxFlat_level_badge")
+text = "Ур. 1"
 
-[node name="HPBar" type="ProgressBar" parent="Control/HPContainer"]
+[node name="HPContainer" type="Control" parent="Control/TopLeft"]
+custom_minimum_size = Vector2(300, 20)
 layout_mode = 2
-custom_minimum_size = Vector2(150, 0)
-size_flags_horizontal = 3
+
+[node name="HPBar" type="ProgressBar" parent="Control/TopLeft/HPContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 max_value = 100.0
 value = 100.0
 show_percentage = false
 
-[node name="HPText" type="Label" parent="Control/HPContainer"]
-layout_mode = 2
-custom_minimum_size = Vector2(85, 0)
+[node name="HPText" type="Label" parent="Control/TopLeft/HPContainer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_colors/font_color = Color(0.941, 0.847, 0.812, 1)
+theme_override_colors/font_shadow_color = Color(0, 0, 0, 0.8)
+theme_override_constants/shadow_offset_y = 1
+theme_override_font_sizes/font_size = 13
 text = "100 / 100"
+horizontal_alignment = 1
 vertical_alignment = 1
 
-[node name="LevelLabel" type="Label" parent="Control"]
+[node name="GoldBadge" type="PanelContainer" parent="Control"]
 layout_mode = 1
-anchor_left = 0.5
-anchor_right = 0.5
-offset_left = -50.0
-offset_top = 10.0
-offset_right = 50.0
-offset_bottom = 36.0
-text = "Ур. 1"
-horizontal_alignment = 1
-
-[node name="GoldLabel" type="Label" parent="Control"]
-layout_mode = 1
+anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
-offset_left = -200.0
-offset_top = 10.0
-offset_right = -10.0
-offset_bottom = 36.0
-text = "Золото: 0"
-horizontal_alignment = 2
+offset_left = -172.0
+offset_top = 22.0
+offset_right = -22.0
+offset_bottom = 58.0
+grow_horizontal = 0
+
+[node name="Row" type="HBoxContainer" parent="Control/GoldBadge"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Spacer" type="Control" parent="Control/GoldBadge/Row"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Coin" type="Label" parent="Control/GoldBadge/Row"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.93, 0.79, 0.36, 1)
+theme_override_font_sizes/font_size = 16
+text = "●"
+vertical_alignment = 1
+
+[node name="GoldValue" type="Label" parent="Control/GoldBadge/Row"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.878, 0.698, 0.416, 1)
+theme_override_fonts/font = SubResource("FontVariation_hud")
+theme_override_font_sizes/font_size = 17
+text = "0"
+vertical_alignment = 1
+
+[node name="StatusPanel" type="PanelContainer" parent="Control"]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -306.0
+offset_top = 70.0
+offset_right = -22.0
+offset_bottom = 70.0
+grow_horizontal = 0
+grow_vertical = 1
+
+[node name="Root" type="VBoxContainer" parent="Control/StatusPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Header" type="HBoxContainer" parent="Control/StatusPanel/Root"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_constants/separation = 8
+
+[node name="StatusHeader" type="Label" parent="Control/StatusPanel/Root/Header"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.78, 0.71, 0.6, 1)
+theme_override_constants/letter_spacing = 3
+theme_override_font_sizes/font_size = 14
+text = "СОСТОЯНИЯ"
+
+[node name="Spacer" type="Control" parent="Control/StatusPanel/Root/Header"]
+layout_mode = 2
+mouse_filter = 2
+size_flags_horizontal = 3
+
+[node name="BuffCount" type="Label" parent="Control/StatusPanel/Root/Header"]
+layout_mode = 2
+mouse_filter = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.498, 0.682, 0.384, 1)
+theme_override_font_sizes/font_size = 14
+text = "▲ 0"
+
+[node name="DebuffCount" type="Label" parent="Control/StatusPanel/Root/Header"]
+layout_mode = 2
+mouse_filter = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.82, 0.416, 0.29, 1)
+theme_override_font_sizes/font_size = 14
+text = "▼ 0"
+
+[node name="Chevron" type="Label" parent="Control/StatusPanel/Root/Header"]
+layout_mode = 2
+mouse_filter = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.541, 0.49, 0.42, 1)
+theme_override_font_sizes/font_size = 15
+text = "⌄"
+
+[node name="Ticker" type="VBoxContainer" parent="Control/StatusPanel/Root"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Expanded" type="VBoxContainer" parent="Control/StatusPanel/Root"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="Scroll" type="ScrollContainer" parent="Control/StatusPanel/Root/Expanded"]
+custom_minimum_size = Vector2(0, 210)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="StatusList" type="VBoxContainer" parent="Control/StatusPanel/Root/Expanded/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 5
+
+[node name="ShowAllButton" type="Button" parent="Control/StatusPanel/Root/Expanded"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.725, 0.541, 0.369, 1)
+theme_override_font_sizes/font_size = 14
+flat = true
+text = "Показать все ›"
