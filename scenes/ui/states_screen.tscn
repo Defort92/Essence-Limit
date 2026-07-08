@@ -1,7 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=6 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/states_screen.gd" id="1_script"]
 [ext_resource type="Shader" path="res://assets/shaders/backdrop_blur.gdshader" id="2_blur"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_close_button.gd" id="3_close"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="4_sep"]
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_blur"]
 shader = ExtResource("2_blur")
@@ -105,12 +107,12 @@ text = "▼ 0 недуга"
 [node name="CloseButton" type="Button" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
 layout_mode = 2
 size_flags_vertical = 4
-text = "Закрыть (C)"
+script = ExtResource("3_close")
+close_action = "states"
 
 [node name="HeaderSeparator" type="ColorRect" parent="CenterContainer/Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.2)
+script = ExtResource("4_sep")
 
 [node name="Columns" type="HBoxContainer" parent="CenterContainer/Panel/Margin/VBox"]
 layout_mode = 2

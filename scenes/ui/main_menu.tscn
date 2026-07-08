@@ -1,7 +1,8 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_script"]
 [ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="9_sep"]
 
 [sub_resource type="Gradient" id="Gradient_bg"]
 offsets = PackedFloat32Array(0, 0.46, 1)
@@ -360,9 +361,8 @@ step = 0.05
 value = 1.0
 
 [node name="Separator1" type="ColorRect" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.16)
+script = ExtResource("9_sep")
 
 [node name="FullscreenRow" type="HBoxContainer" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
 layout_mode = 2
@@ -378,9 +378,8 @@ text = "Полноэкранный режим"
 layout_mode = 2
 
 [node name="Separator2" type="ColorRect" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.16)
+script = ExtResource("9_sep")
 
 [node name="LanguageRow" type="HBoxContainer" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
 layout_mode = 2
@@ -399,9 +398,8 @@ theme_override_font_sizes/font_size = 17
 text = "Русский"
 
 [node name="Separator3" type="ColorRect" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.16)
+script = ExtResource("9_sep")
 
 [node name="ControlsButton" type="Button" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
 layout_mode = 2

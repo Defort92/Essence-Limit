@@ -11,6 +11,11 @@
 [ext_resource type="Script" path="res://scripts/systems/mob_spawner.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/components/healing_aura.gd" id="10"]
 [ext_resource type="Resource" path="res://resources/statuses/regeneration.tres" id="11"]
+[ext_resource type="Script" path="res://scripts/systems/party_starter.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/data/companion_data.gd" id="13"]
+[ext_resource type="Resource" path="res://resources/companions/mercenary_healer.tres" id="14"]
+[ext_resource type="Resource" path="res://resources/companions/mercenary_fighter.tres" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/world/scene_portal.tscn" id="16"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(60, 1, 60)
@@ -52,7 +57,17 @@ surface_material_override/0 = SubResource("StandardMaterial3D_1")
 [node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8525088, 0)
 
+[node name="PartyStarter" type="Node" parent="."]
+script = ExtResource("12")
+companions = Array[ExtResource("13")]([ExtResource("14"), ExtResource("15")])
+
+[node name="PortalToCity" parent="." instance=ExtResource("16")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, 6)
+target_scene = "res://scenes/world/human_city.tscn"
+destination_name = "Человеческий город"
+
 [node name="HUD" parent="." unique_id=1866468055 instance=ExtResource("3")]
+location_name = "Испытательный полигон"
 
 [node name="LootUI" parent="." instance=ExtResource("6")]
 

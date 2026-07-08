@@ -32,11 +32,30 @@ const REGEN_TICK_INTERVAL: float = 1.0
 
 # --- Константы ИИ-поведения союзников (когда control_mode == AI) ---
 ## Дистанция, дальше которой ИИ-союзник подтягивается к лидеру отряда.
+## База для личной дистанции участника (_ai_follow_distance, см. _seed_ai_personality).
 const AI_FOLLOW_DISTANCE: float = 2.5
 ## Дистанция, дальше которой подтягивание ускоряется (отстал слишком сильно).
 const AI_FOLLOW_CATCHUP_DISTANCE: float = 6.0
+## Сколько секунд союзник, догнавший сильное отставание, идёт рядом с лидером
+## (плечом к плечу), прежде чем вернуться на своё место в формации.
+const AI_BESIDE_DURATION: float = 3.5
 ## Радиус, в котором ИИ-союзник сам находит и атакует ближайшего врага.
 const AI_ENGAGE_RANGE: float = 8.0
+
+# --- Уступание дороги вне боя ---
+## Вне боя (исследование территории) союзник, стоящий на пути идущего прямо на него
+## лидера, делает шаг в сторону, освобождая дорогу, — иначе игрок утыкается в товарища.
+## Дистанция до лидера, ближе которой союзник начинает уступать дорогу.
+const AI_YIELD_DISTANCE: float = 1.5
+## Насколько прямо лидер должен идти на союзника (dot его курса и направления на союзника),
+## чтобы тот счёл, что перегородил дорогу. 1.0 — точно в лоб, 0.0 — сбоку.
+const AI_YIELD_APPROACH_DOT: float = 0.35
+## Минимальный квадрат скорости лидера, при котором он считается идущим (а не стоящим).
+const AI_YIELD_LEADER_SPEED_SQ: float = 0.25
+## Сколько секунд союзник держит шаг в сторону, уступив дорогу, — чтобы шаг не дёргался.
+const AI_YIELD_DURATION: float = 0.45
+## Множитель скорости бокового шага при уступании дороги.
+const AI_YIELD_SPEED_SCALE: float = 0.9
 
 enum State { IDLE, MOVE, DODGE, ATTACK, DEAD }
 var state: State = State.IDLE
@@ -59,6 +78,10 @@ var roster_index: int = -1
 ## Определяет базовые статы через GameManager.RACE_BASE_STATS.
 var race: int = 0
 var member_name: String = ""
+
+## Боевая роль под управлением ИИ (CompanionData.Role): FIGHTER только атакует,
+## HEALER только лечит отряд и не вступает в бой. На управление игроком не влияет.
+var combat_role: int = CompanionData.Role.FIGHTER
 
 ## Доверие/признание наёмника к главному герою (0..100). При падении до 0 наёмник
 ## предаёт отряд (становится врагом) или сбегает — см. PartySystem.on_trust_bottomed().
@@ -617,11 +640,45 @@ const AI_RETARGET_INTERVAL: float = 0.3
 var _ai_retarget_timer: float = 0.0
 var _ai_cached_target: Node3D = null
 
+# --- «Личность» движения союзника (задаётся в _seed_ai_personality) ---
+## Личный множитель скорости следования: кто-то бодрее лидера, кто-то ленивее.
+var _ai_speed_jitter: float = 1.0
+## Стремление забегать вперёд по ходу движения лидера (0 — держится позади,
+## 1 — норовит обогнать). Смещает точку следования вперёд, когда лидер идёт.
+var _ai_eagerness: float = 0.5
+## Личная комфортная дистанция следования (разброс вокруг AI_FOLLOW_DISTANCE).
+var _ai_follow_distance: float = AI_FOLLOW_DISTANCE
+## Параметры медленного бокового дрейфа точки следования — траектория «плавает»,
+## а не тянется по линейке за лидером.
+var _ai_sway_phase: float = 0.0
+var _ai_sway_freq: float = 0.5
+var _ai_sway_amp: float = 0.5
+## С какой стороны лидера этот союзник пристраивается, когда идёт рядом (+1/-1).
+var _ai_beside_side: float = 1.0
+## > 0 — союзник недавно догнал сильное отставание и пока идёт рядом с лидером.
+var _ai_beside_timer: float = 0.0
+## > 0 — союзник сейчас уступает дорогу лидеру (шагает в сторону), см. _ai_try_yield.
+var _ai_yield_timer: float = 0.0
+## Направление бокового шага при уступании дороги (мировые координаты, нормализовано).
+var _ai_yield_dir: Vector3 = Vector3.ZERO
+## Накопленное время ИИ — фаза для осцилляций дрейфа.
+var _ai_time: float = 0.0
+
 ## Решает, атаковать ближайшую враждебную цель, следовать за лидером или убегать.
 ## Сама цель переоценивается раз в AI_RETARGET_INTERVAL, но сближение/атака идут каждый кадр.
 func _ai_process(delta: float) -> void:
+	_ai_time += delta
+	if _ai_beside_timer > 0.0:
+		_ai_beside_timer -= delta
+	if _ai_yield_timer > 0.0:
+		_ai_yield_timer -= delta
 	if _is_fleeing:
 		_ai_flee()
+		return
+	# Лекарь в составе отряда не сражается вовсе — только лечит и держится за лидером.
+	# Предатель-лекарь теряет роль и дерётся как боец (иначе враг, который ничего не делает).
+	if combat_role == CompanionData.Role.HEALER and PartySystem.members.has(self):
+		_ai_healer_process(delta)
 		return
 	_ai_retarget_timer -= delta
 	if _ai_retarget_timer <= 0.0:
@@ -674,6 +731,59 @@ func _ai_engage(enemy: Node3D) -> void:
 	if dist <= atk_range and _attack_timer <= 0.0:
 		_start_attack()
 
+# --- ИИ лекаря (combat_role == HEALER) ---
+## Дистанция, с которой лекарь может исцелить союзника.
+const AI_HEAL_RANGE: float = 6.0
+## Пауза между исцелениями (сек).
+const AI_HEAL_COOLDOWN: float = 2.0
+## Лечит союзников, чья доля HP ниже этого порога (1.0 = долечивает до полного).
+const AI_HEAL_THRESHOLD: float = 0.95
+## База лечения; итог = база + интеллект / 2 (см. _get_heal_power).
+const AI_HEAL_BASE_AMOUNT: int = 8
+
+var _ai_heal_timer: float = 0.0
+
+## Поведение лекаря: найти самого раненого живого участника отряда, подойти на дистанцию
+## лечения и исцелять по кулдауну. Если лечить некого — держаться за лидером. Не атакует.
+func _ai_healer_process(delta: float) -> void:
+	if _ai_heal_timer > 0.0:
+		_ai_heal_timer -= delta
+	var patient := _ai_find_heal_target()
+	if patient == null:
+		_ai_follow_leader()
+		return
+	var dist: float = global_position.distance_to(patient.global_position)
+	if dist > AI_HEAL_RANGE:
+		_ai_move_toward(patient.global_position)
+		return
+	_ai_hold_position()
+	# Разворачиваемся к пациенту (лечение самого себя направление не меняет).
+	var to_patient: Vector3 = patient.global_position - global_position
+	to_patient.y = 0.0
+	if to_patient.length_squared() > 0.01:
+		_last_move_dir = to_patient.normalized()
+	if _ai_heal_timer <= 0.0:
+		_ai_heal_timer = AI_HEAL_COOLDOWN
+		patient.heal(_get_heal_power())
+
+## Самый раненый (по доле HP) живой участник отряда ниже порога AI_HEAL_THRESHOLD,
+## включая самого лекаря. null — если весь отряд достаточно здоров.
+func _ai_find_heal_target() -> Player:
+	var worst: Player = null
+	var worst_ratio: float = AI_HEAL_THRESHOLD
+	for member in PartySystem.members:
+		if not is_instance_valid(member) or member.state == State.DEAD:
+			continue
+		var ratio: float = float(member.health) / float(member.max_health)
+		if ratio < worst_ratio:
+			worst_ratio = ratio
+			worst = member
+	return worst
+
+## Сила одного исцеления лекаря: масштабируется интеллектом, как урон — силой.
+func _get_heal_power() -> int:
+	return AI_HEAL_BASE_AMOUNT + get_total_stat("intellect") / 2
+
 ## true если в основной руке дальнобойное оружие — тогда ИИ держит дистанцию вместо сближения.
 func _ai_is_ranged_role() -> bool:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
@@ -681,18 +791,89 @@ func _ai_is_ranged_role() -> bool:
 
 ## Вне боя союзник держится рядом с активным (управляемым игроком) персонажем отряда,
 ## со смещением по формации — иначе все союзники сойдутся в одну точку и будут толкаться.
+## Каждый следует чуть по-своему (личный темп, дистанция, дрейф, обгон) — см.
+## _seed_ai_personality и _ai_follow_offset.
 func _ai_follow_leader() -> void:
 	var leader := PartySystem.get_active_member()
 	if leader == null or leader == self:
 		_ai_hold_position()
 		return
-	var desired_pos: Vector3 = leader.global_position + _ai_formation_offset()
+	# Вне боя уступаем дорогу: если лидер вплотную идёт прямо на нас, шагаем в сторону,
+	# чтобы игрок не утыкался в товарища при исследовании территории.
+	if _ai_try_yield(leader):
+		return
+	var desired_pos: Vector3 = leader.global_position + _ai_follow_offset(leader)
 	var dist: float = global_position.distance_to(desired_pos)
-	if dist <= AI_FOLLOW_DISTANCE:
+	if dist <= _ai_follow_distance:
 		_ai_hold_position()
 		return
-	var speed_scale := 1.6 if dist > AI_FOLLOW_CATCHUP_DISTANCE else 1.0
+	var speed_scale: float = _ai_speed_jitter
+	if dist > AI_FOLLOW_CATCHUP_DISTANCE:
+		# Сильно отстал — бежит догонять, а догнав, какое-то время идёт рядом с лидером.
+		speed_scale = 1.6 * _ai_speed_jitter
+		_ai_beside_timer = AI_BESIDE_DURATION
 	_ai_move_toward(desired_pos, speed_scale)
+
+## Вне боя союзник уступает дорогу лидеру: если тот подошёл вплотную и движется прямо на
+## союзника, союзник делает шаг в сторону (перпендикулярно курсу лидера), освобождая путь.
+## Возвращает true, пока уступает, — тогда обычное следование за лидером в этом кадре
+## пропускается. Шаг удерживается AI_YIELD_DURATION секунд, чтобы движение не дёргалось.
+func _ai_try_yield(leader: Player) -> bool:
+	if _ai_yield_timer <= 0.0:
+		var leader_dir: Vector3 = leader.velocity
+		leader_dir.y = 0.0
+		if leader_dir.length_squared() < AI_YIELD_LEADER_SPEED_SQ:
+			return false  # лидер стоит — уступать некому
+		var to_self: Vector3 = global_position - leader.global_position
+		to_self.y = 0.0
+		if to_self.length() > AI_YIELD_DISTANCE:
+			return false  # лидер ещё далеко
+		leader_dir = leader_dir.normalized()
+		# Стоим ровно на лидере — уступаем перпендикулярно его курсу в любую сторону.
+		var to_self_dir: Vector3 = to_self.normalized() if to_self.length_squared() > 0.0001 else leader_dir
+		if leader_dir.dot(to_self_dir) < AI_YIELD_APPROACH_DOT:
+			return false  # лидер идёт мимо, а не на нас — дорогу не перегораживаем
+		# Шаг вбок: перпендикуляр к курсу лидера, в ту сторону, куда союзник уже смещён,
+		# чтобы освободить путь кратчайшим движением.
+		var side: Vector3 = leader_dir.cross(Vector3.UP)
+		if side.length_squared() < 0.0001:
+			return false
+		side = side.normalized()
+		if side.dot(to_self_dir) < 0.0:
+			side = -side
+		_ai_yield_dir = side
+		_ai_yield_timer = AI_YIELD_DURATION
+	# Активная фаза: делаем боковой шаг, освобождая дорогу.
+	_ai_move_toward(global_position + _ai_yield_dir, AI_YIELD_SPEED_SCALE)
+	return true
+
+## Точка следования этого союзника относительно лидера. К месту в формации добавляются
+## личные «живые» поправки:
+## - медленный боковой дрейф (синусоида) — путь слегка гуляет, а не тянется по прямой;
+## - забегание вперёд по ходу движения лидера — нетерпеливые пытаются обогнать;
+## - после догона сильного отставания союзник идёт сбоку от лидера, а не позади.
+func _ai_follow_offset(leader: Player) -> Vector3:
+	var leader_dir: Vector3 = leader.velocity
+	leader_dir.y = 0.0
+	var leader_moving: bool = leader_dir.length_squared() > 0.25
+	if leader_moving:
+		leader_dir = leader_dir.normalized()
+
+	var sway := Vector3(
+		sin(_ai_time * _ai_sway_freq + _ai_sway_phase),
+		0.0,
+		cos(_ai_time * _ai_sway_freq * 0.8 + _ai_sway_phase * 1.7)
+	) * _ai_sway_amp
+
+	if _ai_beside_timer > 0.0 and leader_moving:
+		# Идём плечом к плечу: точка сбоку от лидера, перпендикулярно его движению.
+		var side: Vector3 = leader_dir.cross(Vector3.UP) * _ai_beside_side
+		return side * 1.5 + sway * 0.5
+
+	var offset: Vector3 = _ai_formation_offset() + sway
+	if leader_moving:
+		offset += leader_dir * (_ai_eagerness * 2.5)
+	return offset
 
 ## Фиксированные смещения от лидера для до 4 союзников (макс. отряд — 5 персонажей).
 const AI_FORMATION_OFFSETS: Array[Vector3] = [
@@ -754,6 +935,9 @@ func _init_from_roster() -> void:
 	race = int(entry.get("race", GameManager.player_race))
 	member_name = str(entry.get("name", GameManager.player_name))
 	trust = int(entry.get("trust", 100))
+	combat_role = int(entry.get("role", CompanionData.Role.FIGHTER))
+
+	_seed_ai_personality()
 
 	var stats := GameManager.get_race_base_stats(race as GameManager.Race)
 	base_max_health = stats.get("max_health", 100)
@@ -790,6 +974,20 @@ func _init_from_roster() -> void:
 	var saved_health := int(entry.get("health", -1))
 	health = clampi(saved_health if saved_health > 0 else max_health, 1, max_health)
 	health_changed.emit(health, max_health)
+
+## Детерминированная «личность» движения: у каждого участника свой характер следования
+## (темп, дистанция, дрейф, желание обгонять). Сид — из имени и места в roster, поэтому
+## характер стабилен между кадрами и сменами сцен, но различается у разных наёмников.
+func _seed_ai_personality() -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(member_name) * 31 + roster_index
+	_ai_speed_jitter = rng.randf_range(0.9, 1.15)
+	_ai_eagerness = rng.randf()
+	_ai_follow_distance = AI_FOLLOW_DISTANCE * rng.randf_range(0.7, 1.35)
+	_ai_sway_phase = rng.randf_range(0.0, TAU)
+	_ai_sway_freq = rng.randf_range(0.3, 0.7)
+	_ai_sway_amp = rng.randf_range(0.25, 0.7)
+	_ai_beside_side = 1.0 if rng.randf() < 0.5 else -1.0
 
 func _on_level_up(_new_level: int) -> void:
 	var bonus := GameManager.get_race_level_bonus(race as GameManager.Race)

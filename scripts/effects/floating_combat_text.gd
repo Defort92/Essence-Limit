@@ -56,7 +56,8 @@ func _configure(amount: int, kind: int) -> void:
 	no_depth_test = true
 	shaded = false
 	double_sided = true
-	pixel_size = 0.0045
+	# 0.002: при font_size 32/46 цифры выходят заметно меньше спрайта персонажа.
+	pixel_size = 0.002
 	outline_size = 6
 	outline_modulate = Color(0.0, 0.0, 0.0, 0.85)
 	render_priority = 10

@@ -21,7 +21,8 @@ const BETRAYAL_CHANCE: float = 0.5
 const COMPANION_SCENE_PATH := "res://scenes/characters/player.tscn"
 
 ## Персистентные данные участников. Ключи записи:
-## race:int, name:String, trust:int, health:int (-1 = полное HP),
+## race:int, name:String, trust:int, role:int (CompanionData.Role),
+## health:int (-1 = полное HP),
 ## quick_slots:Array, equipment:Dictionary (EquipmentManager.serialize),
 ## essence_bonus_slots:int, essences:Array (пути ресурсов или null).
 var roster: Array[Dictionary] = []
@@ -88,18 +89,34 @@ func _find_member_by_roster_index(roster_idx: int) -> Player:
 ## Нанимает наёмника [param data] за золото. Спавнит его рядом с активным участником.
 ## Возвращает [code]false[/code] если отряд полон или не хватает золота.
 func recruit(data: CompanionData) -> bool:
+	if roster.size() >= MAX_PARTY_SIZE or get_active_member() == null:
+		return false
+	if not GameManager.spend_gold(data.hire_cost):
+		return false
+	return add_companion(data)
+
+## Добавляет наёмника [param data] в отряд бесплатно (стартовые союзники сцены,
+## скриптовые события). Спавнит его рядом с активным участником.
+## Возвращает [code]false[/code] если отряд полон или в сцене нет активного участника.
+func add_companion(data: CompanionData) -> bool:
 	if roster.size() >= MAX_PARTY_SIZE:
 		return false
 	var leader := get_active_member()
 	if leader == null:
 		return false
-	if not GameManager.spend_gold(data.hire_cost):
-		return false
-	roster.append(_make_roster_entry(data.race, data.display_name, data.initial_trust))
+	roster.append(_make_roster_entry(data.race, data.display_name, data.initial_trust, data.combat_role))
 	var new_index := roster.size() - 1
 	_spawn_companion(new_index, leader)
 	member_recruited.emit(new_index)
 	return true
+
+## true если в отряде уже есть участник с именем [param member_name] —
+## защита от повторного добавления стартовых союзников при перезаходе в сцену.
+func has_member_named(member_name: String) -> bool:
+	for entry in roster:
+		if str(entry.get("name", "")) == member_name:
+			return true
+	return false
 
 # ─── Активный участник ──────────────────────────────────────────────────────
 
@@ -244,11 +261,12 @@ func reset() -> void:
 	roster.clear()
 	active_index = -1
 
-func _make_roster_entry(race: int, member_name: String, trust: int) -> Dictionary:
+func _make_roster_entry(race: int, member_name: String, trust: int, role: int = CompanionData.Role.FIGHTER) -> Dictionary:
 	return {
 		"race": int(race),
 		"name": member_name,
 		"trust": trust,
+		"role": int(role),
 		"health": -1,
 		"quick_slots": ["", "", "", ""],
 		"equipment": {},

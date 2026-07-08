@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3]
+[gd_scene load_steps=16 format=3]
 
 [ext_resource type="Script" path="res://scripts/camera/game_camera.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/characters/player.tscn" id="2"]
@@ -12,6 +12,7 @@
 [ext_resource type="Resource" path="res://resources/companions/mercenary_barbarian.tres" id="10"]
 [ext_resource type="PackedScene" path="res://scenes/ui/loot_ui.tscn" id="11"]
 [ext_resource type="PackedScene" path="res://scenes/ui/states_screen.tscn" id="12"]
+[ext_resource type="PackedScene" path="res://scenes/world/scene_portal.tscn" id="13"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(80, 1, 80)
@@ -61,7 +62,13 @@ vendor_data = ExtResource("6")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.9, 2)
 companion_data = ExtResource("10")
 
+[node name="PortalToWastes" parent="." instance=ExtResource("13")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -7)
+target_scene = "res://scenes/main.tscn"
+destination_name = "Пустошь"
+
 [node name="HUD" parent="." instance=ExtResource("3")]
+location_name = "Человеческий город"
 
 [node name="ShopUI" parent="." instance=ExtResource("4")]
 

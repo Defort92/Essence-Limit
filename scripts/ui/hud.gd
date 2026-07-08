@@ -1,5 +1,9 @@
 extends CanvasLayer
 
+## Название локации мира для баннера места (см. LocationBanner). Задаётся на инстансе HUD
+## в каждой сцене; в подземелье баннер вместо него показывает «ЭТАЖ N» из DungeonPortal.
+@export var location_name: String = ""
+
 ## Как часто (сек) обновляются подписи таймеров статусов в развёрнутой панели.
 const STATUS_TIMER_REFRESH: float = 0.2
 ## Сколько секунд «тост» нового статуса живёт в ленте, прежде чем угаснуть.
@@ -31,6 +35,7 @@ const ROW_BG: Color = Color(0.078, 0.063, 0.055, 0.4)
 @onready var _expanded_box: VBoxContainer = $Control/StatusPanel/Root/Expanded
 @onready var _status_list: VBoxContainer = $Control/StatusPanel/Root/Expanded/Scroll/StatusList
 @onready var _show_all_btn: Button = $Control/StatusPanel/Root/Expanded/ShowAllButton
+@onready var _location_banner: Control = $Control/LocationBanner
 
 ## Участник, чьи статусы сейчас показывает панель (обычно активный игрок).
 var _status_member: Player = null
@@ -59,6 +64,7 @@ func _ready() -> void:
 	_show_all_btn.pressed.connect(_open_states_modal)
 	_build_badge_styles()
 	_apply_expanded_state()
+	_location_banner.set_world_location(location_name)
 	call_deferred("_connect_player")
 
 ## Строит градиентные подложки: золото (затемнение к правому краю экрана) и такую же

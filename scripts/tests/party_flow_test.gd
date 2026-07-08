@@ -45,6 +45,8 @@ func _ready() -> void:
 			failures.append("раса наёмника: %d (ожидался варвар)" % companion.race)
 		if companion.member_name != "Гром":
 			failures.append("имя наёмника: '%s'" % companion.member_name)
+		if companion.combat_role != CompanionData.Role.FIGHTER:
+			failures.append("combat_role варвара: %d (ожидался FIGHTER)" % companion.combat_role)
 
 		# 3. Доверие в ноль → предаёт или сбегает, покидает отряд.
 		companion.modify_trust(-50)
@@ -57,7 +59,24 @@ func _ready() -> void:
 		if companion._is_traitor and companion.faction != Faction.Kind.HOSTILE_NPC:
 			failures.append("предатель не сменил фракцию")
 
-	# 4. Сохранение и загрузка состава (с бэкапом реального сейва в слоте 2).
+	# 4. Вербовка лекаря: роль из CompanionData доходит до записи roster и спавненного участника.
+	GameManager.add_gold(100)
+	var healer_data := load("res://resources/companions/mercenary_healer.tres") as CompanionData
+	if healer_data.combat_role != CompanionData.Role.HEALER:
+		failures.append("ресурс mercenary_healer без роли HEALER")
+	if not PartySystem.recruit(healer_data):
+		failures.append("recruit(лекарь) вернул false")
+	await get_tree().process_frame
+	var healer: Player = null
+	for member in PartySystem.members:
+		if member.roster_index == 1:
+			healer = member
+	if healer == null:
+		failures.append("лекарь не найден в members")
+	elif healer.combat_role != CompanionData.Role.HEALER:
+		failures.append("combat_role лекаря: %d (ожидался HEALER)" % healer.combat_role)
+
+	# 5. Сохранение и загрузка состава (с бэкапом реального сейва в слоте 2).
 	var backup_text := ""
 	var had_real_save := SaveSystem.has_save(2)
 	if had_real_save:
@@ -70,8 +89,10 @@ func _ready() -> void:
 	PartySystem.reset()
 	if not SaveSystem.load_game(2):
 		failures.append("load_game(2) вернул false")
-	if PartySystem.roster.size() != 1:
-		failures.append("roster после загрузки: %d (ожидался 1)" % PartySystem.roster.size())
+	if PartySystem.roster.size() != 2:
+		failures.append("roster после загрузки: %d (ожидалось 2: герой + лекарь)" % PartySystem.roster.size())
+	elif int(PartySystem.roster[1].get("role", -1)) != CompanionData.Role.HEALER:
+		failures.append("роль лекаря не пережила сохранение/загрузку")
 
 	if had_real_save:
 		var restore_file := FileAccess.open(TEST_SLOT_PATH, FileAccess.WRITE)

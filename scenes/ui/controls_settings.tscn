@@ -1,6 +1,7 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/controls_settings.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="2_sep"]
 
 [node name="ControlsSettings" type="Control"]
 layout_mode = 3
@@ -84,9 +85,8 @@ text = "Движение на WASD/стрелках. Блок щитом — п�
 autowrap_mode = 3
 
 [node name="Separator1" type="ColorRect" parent="Panel/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.16)
+script = ExtResource("2_sep")
 
 [node name="Scroll" type="ScrollContainer" parent="Panel/Margin/VBoxContainer"]
 layout_mode = 2

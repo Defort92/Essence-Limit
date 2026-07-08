@@ -10,8 +10,16 @@ class_name VendorNPC
 var _player_in_range: bool = false
 
 func _ready() -> void:
+	add_to_group("minimap_object")
 	$InteractionArea.body_entered.connect(_on_body_entered)
 	$InteractionArea.body_exited.connect(_on_body_exited)
+	# Подсказка показывает актуальную клавишу «interact» — обновляем её при переназначении.
+	InputSettings.bindings_changed.connect(_update_prompt_text)
+	_update_prompt_text()
+
+func _update_prompt_text() -> void:
+	if _prompt != null:
+		_prompt.text = "%s — Торговать" % InputSettings.action_key_label("interact")
 
 func _on_body_entered(body: Node3D) -> void:
 	if body is Player:

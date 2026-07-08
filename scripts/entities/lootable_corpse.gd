@@ -71,6 +71,8 @@ func _ready() -> void:
 
 	if source_player != null and is_instance_valid(source_player):
 		source_player.equipment.equipment_changed.connect(_on_source_changed)
+	# Подсказка показывает актуальную клавишу «interact» — обновляем её при переназначении.
+	InputSettings.bindings_changed.connect(_update_prompt)
 	_update_prompt()
 
 ## Рисует затемнённый спрайт погибшего врага как «труп»-маркер на месте гибели.
@@ -125,7 +127,7 @@ func _update_prompt() -> void:
 	if is_empty():
 		_prompt.text = ""
 	elif _player_in_range:
-		_prompt.text = "F — Обыскать"
+		_prompt.text = "%s — Обыскать" % InputSettings.action_key_label("interact")
 	else:
 		_prompt.text = "◆"
 

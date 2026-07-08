@@ -1,10 +1,9 @@
 ## Модальное окно состояний: все активные статусы активного участника отряда — блага
 ## слева, недуги справа, с глифом, названием, таймером и описанием. Открывается поверх
 ## боя из HUD (клик по статусу в ленте/панели или по «Показать все»), см. HUD._open_states_modal.
-## Ставит игру на паузу и размывает фон (BlurRect). Закрывается: клик вне окна (Backdrop),
-## кнопка «Закрыть», клавиша "states" (C) или снятие паузы (ESC). Показывает снимок на момент
-## открытия; живой отсчёт идёт в ленте/панели HUD.
-extends CanvasLayer
+## Каркас модалки (пауза, блюр, закрытие по клавише "states"/крестику/фону/ESC) —
+## в UIModalScreen. Показывает снимок на момент открытия; живой отсчёт идёт в ленте HUD.
+extends UIModalScreen
 
 const BUFF_ACCENT := Color(0.498, 0.682, 0.384)
 const DEBUFF_ACCENT := Color(0.82, 0.416, 0.29)
@@ -25,34 +24,16 @@ var _icon_buff_style: StyleBoxFlat
 var _icon_debuff_style: StyleBoxFlat
 
 func _ready() -> void:
-	add_to_group("states_screen")
-	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
+	# Когда экран скрыт, "states" (C) не поглощается (см. UIModalScreen) — его обработает
+	# HUD, где C переключает свёрнутую панель состояний.
+	screen_group = "states_screen"
+	close_action = "states"
+	super._ready()
 	_build_icon_styles()
-	hide()
-	# ESC снимает паузу через PauseManager — прячемся вместе с миром, чтобы экран
-	# не остался висеть поверх разблокированной игры.
-	PauseManager.unpaused.connect(func() -> void: hide())
-
-## Пока окно открыто, "states" (C) его закрывает. Когда скрыто — событие не поглощаем,
-## чтобы его обработал HUD (там C переключает свёрнутую панель состояний).
-func _unhandled_input(event: InputEvent) -> void:
-	if visible and event.is_action_pressed("states"):
-		close()
-		get_viewport().set_input_as_handled()
 
 func open() -> void:
 	_select_member(PartySystem.get_active_member())
-	show()
-	PauseManager.pause()
-
-func close() -> void:
-	hide()
-	PauseManager.unpause()
-
-## Клик по затемнённому фону вне окна — вернуться в бой (снять паузу и закрыть окно).
-func _on_backdrop_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed:
-		close()
+	_show_modal()
 
 func _select_member(member: Player) -> void:
 	if member == null:
@@ -174,6 +155,3 @@ func _build_icon_styles() -> void:
 	_icon_debuff_style.content_margin_top = 10
 	_icon_debuff_style.content_margin_right = 10
 	_icon_debuff_style.content_margin_bottom = 10
-
-func _on_close_pressed() -> void:
-	close()

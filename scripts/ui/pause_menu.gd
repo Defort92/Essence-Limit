@@ -1,6 +1,6 @@
 ## Меню паузы: не переключает паузу сама — только реагирует на сигналы PauseManager.
-## Если пауза уже "занята" открытой лавкой/экраном персонажа (группы "shop_ui" /
-## "character_screen"), не показывается поверх них — тот экран сам её закроет по ESC.
+## Если пауза уже "занята" другим модальным экраном (группа "modal_screen"),
+## не показывается поверх него — тот экран сам закроет её по ESC.
 extends CanvasLayer
 
 const CONTROLS_SETTINGS_SCENE := preload("res://scenes/ui/controls_settings.tscn")
@@ -32,16 +32,12 @@ func _on_unpaused() -> void:
 	hide()
 	_settings_panel.hide()
 
+## Все модальные экраны (обыск, лавка, персонаж, состояния) регистрируются в общей
+## группе "modal_screen" через UIModalScreen — новые экраны учитываются автоматически.
 func _other_overlay_open() -> bool:
-	var shop := get_tree().get_first_node_in_group("shop_ui")
-	if shop != null and shop.visible:
-		return true
-	var character_screen := get_tree().get_first_node_in_group("character_screen")
-	if character_screen != null and character_screen.visible:
-		return true
-	var states_screen := get_tree().get_first_node_in_group("states_screen")
-	if states_screen != null and states_screen.visible:
-		return true
+	for screen in get_tree().get_nodes_in_group("modal_screen"):
+		if screen.visible:
+			return true
 	return false
 
 func _on_resume_pressed() -> void:

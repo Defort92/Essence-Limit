@@ -1,6 +1,8 @@
-[gd_scene load_steps=2 format=3]
+[gd_scene load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/character_screen.gd" id="1_script"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_close_button.gd" id="2_close"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="3_sep"]
 
 [node name="CharacterScreen" type="CanvasLayer"]
 script = ExtResource("1_script")
@@ -51,12 +53,12 @@ text = "Персонаж"
 
 [node name="CloseButton" type="Button" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer/HeaderRow"]
 layout_mode = 2
-text = "Закрыть (I)"
+script = ExtResource("2_close")
+close_action = "inventory"
 
 [node name="HeaderSeparator" type="ColorRect" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
-custom_minimum_size = Vector2(0, 1)
 layout_mode = 2
-color = Color(0.471, 0.376, 0.212, 0.18)
+script = ExtResource("3_sep")
 
 [node name="MemberTabsRow" type="HBoxContainer" parent="Dim/CenterContainer/Panel/Margin/VBoxContainer"]
 layout_mode = 2

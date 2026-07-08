@@ -11,12 +11,14 @@ const BG_COLOR: Color = Color(0.08, 0.05, 0.05, 0.85)
 const FILL_COLOR: Color = Color(0.85, 0.12, 0.12, 1.0)
 
 var _fill: MeshInstance3D = null
+var _fill_mesh: QuadMesh = null
 var _ratio: float = 1.0
 
 func _ready() -> void:
-	var bg := _make_quad(BG_COLOR, 0)
+	var bg: MeshInstance3D = _make_quad(BG_COLOR, 0)
 	add_child(bg)
 	_fill = _make_quad(FILL_COLOR, 1)
+	_fill_mesh = _fill.mesh as QuadMesh
 	add_child(_fill)
 	_apply_ratio()
 
@@ -42,10 +44,13 @@ func set_values(current: int, maximum: int) -> void:
 	_apply_ratio()
 
 ## Сжимает заливку влево по доле HP: ширина = BAR_WIDTH * ratio, левый край на месте.
+## Меняем сам QuadMesh (size + center_offset), а не transform узла: billboard-материал
+## игнорирует масштаб узла, а смещение позиции идёт в мировых осях — полоска бы просто ездила.
 func _apply_ratio() -> void:
-	if _fill == null:
+	if _fill_mesh == null:
 		return
 	var r: float = clampf(_ratio, 0.0, 1.0)
-	_fill.scale.x = maxf(r, 0.0001)
-	_fill.position.x = -BAR_WIDTH * (1.0 - r) * 0.5
+	var w: float = maxf(BAR_WIDTH * r, 0.001)
+	_fill_mesh.size = Vector2(w, BAR_HEIGHT)
+	_fill_mesh.center_offset = Vector3(-(BAR_WIDTH - w) * 0.5, 0.0, 0.0)
 	_fill.visible = r > 0.0

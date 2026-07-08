@@ -2,8 +2,8 @@
 ## Одно и то же окно показывает ЛЮБОГО участника отряда — вкладки в MemberTabsRow
 ## переключают, чьи данные отображаются (_target_member). Рюкзак общий на отряд,
 ## экипировка и эссенции — свои у каждого (см. Player.equipment/essence).
-## Открывается/закрывается клавишей "inventory" (I). Ставит игру на паузу, пока открыт.
-extends CanvasLayer
+## Открывается/закрывается клавишей "inventory" (I). Каркас модалки — в UIModalScreen.
+extends UIModalScreen
 
 const SLOT_NAMES := {
 	EquipmentData.Slot.HEAD: "Голова",
@@ -28,38 +28,20 @@ const ARMOR_SLOTS := [
 ## Чьё снаряжение/эссенции сейчас показаны. По умолчанию — активный (управляемый игроком).
 var _target_member: Player = null
 
-var _row_style_normal: StyleBoxFlat
-var _row_style_hover: StyleBoxFlat
-
 func _ready() -> void:
-	add_to_group("character_screen")
-	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
-	_build_row_styles()
-	hide()
+	screen_group = "character_screen"
+	close_action = "inventory"
+	super._ready()
 	InventorySystem.inventory_changed.connect(_on_state_changed)
-	# ESC снимает паузу через PauseManager напрямую (не через close()) — синхронизируемся,
-	# чтобы панель не осталась висеть на экране поверх разблокированного мира.
-	PauseManager.unpaused.connect(func() -> void: hide())
 
-func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_pressed("inventory"):
-		toggle()
-		get_viewport().set_input_as_handled()
-
-func toggle() -> void:
-	if visible:
-		close()
-	else:
-		open()
+## Клавиша "inventory" при скрытом экране открывает его (экран-переключатель).
+func _on_action_while_hidden() -> void:
+	open()
+	get_viewport().set_input_as_handled()
 
 func open() -> void:
 	_select_member(PartySystem.get_active_member())
-	show()
-	PauseManager.pause()
-
-func close() -> void:
-	hide()
-	PauseManager.unpause()
+	_show_modal()
 
 func _on_state_changed() -> void:
 	if visible:
@@ -98,15 +80,11 @@ func _rebuild_member_tabs() -> void:
 		var label_text: String = member.member_name
 		if label_text.is_empty():
 			label_text = "Герой" if member.roster_index == 0 else "Союзник %d" % idx
-		var button := Button.new()
-		button.text = label_text
-		var is_current: bool = member == _target_member
-		button.add_theme_stylebox_override("normal", _row_style_hover if is_current else _row_style_normal)
-		button.add_theme_stylebox_override("hover", _row_style_hover)
-		button.add_theme_color_override("font_color", Color(0.78, 0.71, 0.6, 1))
-		button.add_theme_color_override("font_hover_color", Color(0.95, 0.83, 0.45, 1))
-		button.pressed.connect(func() -> void: _select_member(member))
-		_member_tabs.add_child(button)
+		_member_tabs.add_child(UIListRow.make_button(
+			label_text,
+			func() -> void: _select_member(member),
+			member == _target_member
+		))
 
 # ─── Экипировка ────────────────────────────────────────────────────────────
 
@@ -119,16 +97,16 @@ func _rebuild_equipment_list() -> void:
 		var item: EquipmentData = target_equipment.get_equipped(slot)
 		var label_name: String = SLOT_NAMES.get(slot, "?")
 		if item == null:
-			_equipment_list.add_child(_make_row("%s: пусто" % label_name, []))
+			_equipment_list.add_child(UIListRow.create("%s: пусто" % label_name))
 			continue
 		if target_equipment.is_slot_broken(slot):
 			var cost: int = target_equipment.get_repair_cost(slot)
-			_equipment_list.add_child(_make_row(
+			_equipment_list.add_child(UIListRow.create(
 				"%s: %s [сломано]" % [label_name, item.display_name],
 				[{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_slot(slot)}]
 			))
 		else:
-			_equipment_list.add_child(_make_row(
+			_equipment_list.add_child(UIListRow.create(
 				"%s: %s" % [label_name, item.display_name],
 				[{"text": "Снять", "callback": func() -> void: target_equipment.unequip_slot(slot)}]
 			))
@@ -138,17 +116,17 @@ func _rebuild_equipment_list() -> void:
 		var item: EquipmentData = accessories[idx]
 		if target_equipment.is_accessory_broken(idx):
 			var cost: int = target_equipment.get_accessory_repair_cost(idx)
-			_equipment_list.add_child(_make_row(
+			_equipment_list.add_child(UIListRow.create(
 				"Аксессуар: %s [сломано]" % item.display_name,
 				[{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_accessory(idx)}]
 			))
 		else:
-			_equipment_list.add_child(_make_row(
+			_equipment_list.add_child(UIListRow.create(
 				"Аксессуар: %s" % item.display_name,
 				[{"text": "Снять", "callback": func() -> void: target_equipment.unequip_accessory(idx)}]
 			))
 	for _idx in (EquipmentManager.MAX_ACCESSORIES - accessories.size()):
-		_equipment_list.add_child(_make_row("Аксессуар: пусто", []))
+		_equipment_list.add_child(UIListRow.create("Аксессуар: пусто"))
 
 # ─── Рюкзак (общий на весь отряд) ───────────────────────────────────────────
 
@@ -175,7 +153,7 @@ func _rebuild_inventory_list() -> void:
 					"callback": func() -> void: _assign_quick_slot(quick_idx, item.id),
 				})
 
-		_inventory_list.add_child(_make_row(label_text, actions))
+		_inventory_list.add_child(UIListRow.create(label_text, actions))
 
 func _assign_quick_slot(slot_idx: int, item_id: String) -> void:
 	_target_member.set_quick_slot(slot_idx, item_id)
@@ -189,57 +167,13 @@ func _rebuild_essence_list() -> void:
 	var target_essence: EssenceSystem = _target_member.essence
 	for idx in target_essence.slots.size():
 		if target_essence.is_slot_locked(idx):
-			_essence_list.add_child(_make_row("Слот %d: заблокирован" % (idx + 1), []))
+			_essence_list.add_child(UIListRow.create("Слот %d: заблокирован" % (idx + 1)))
 			continue
 		var slot_essence: EssenceData = target_essence.slots[idx]
 		if slot_essence == null:
-			_essence_list.add_child(_make_row("Слот %d: пусто" % (idx + 1), []))
+			_essence_list.add_child(UIListRow.create("Слот %d: пусто" % (idx + 1)))
 		else:
-			_essence_list.add_child(_make_row(
+			_essence_list.add_child(UIListRow.create(
 				"Слот %d: %s" % [idx + 1, slot_essence.display_name],
 				[{"text": "Снять (%d зол.)" % slot_essence.removal_cost, "callback": func() -> void: target_essence.remove(idx)}]
 			))
-
-# ─── Общие утилиты строк ───────────────────────────────────────────────────
-
-func _make_row(label_text: String, actions: Array) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 8)
-
-	var label := Label.new()
-	label.text = label_text
-	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_color_override("font_color", Color(0.78, 0.71, 0.6, 1))
-	row.add_child(label)
-
-	for action: Dictionary in actions:
-		var button := Button.new()
-		button.text = action.text
-		button.add_theme_stylebox_override("normal", _row_style_normal)
-		button.add_theme_stylebox_override("hover", _row_style_hover)
-		button.add_theme_color_override("font_color", Color(0.78, 0.71, 0.6, 1))
-		button.add_theme_color_override("font_hover_color", Color(0.95, 0.83, 0.45, 1))
-		button.pressed.connect(action.callback)
-		row.add_child(button)
-
-	return row
-
-func _build_row_styles() -> void:
-	_row_style_normal = StyleBoxFlat.new()
-	_row_style_normal.bg_color = Color(0.039, 0.031, 0.035, 0.85)
-	_row_style_normal.border_width_left = 1
-	_row_style_normal.border_width_top = 1
-	_row_style_normal.border_width_right = 1
-	_row_style_normal.border_width_bottom = 1
-	_row_style_normal.border_color = Color(0.471, 0.376, 0.212, 0.4)
-	_row_style_normal.content_margin_left = 10
-	_row_style_normal.content_margin_top = 3
-	_row_style_normal.content_margin_right = 10
-	_row_style_normal.content_margin_bottom = 3
-
-	_row_style_hover = _row_style_normal.duplicate() as StyleBoxFlat
-	_row_style_hover.bg_color = Color(0.588, 0.275, 0.141, 0.2)
-	_row_style_hover.border_color = Color(0.55, 0.44, 0.25, 0.55)
-
-func _on_close_pressed() -> void:
-	close()

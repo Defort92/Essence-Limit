@@ -15,6 +15,9 @@ enum MovementMode { KEYBOARD, MOUSE }
 var movement_mode: MovementMode = MovementMode.KEYBOARD
 
 signal movement_mode_changed(mode: int)
+## Испускается после применения новых привязок (кнопка «Сохранить»). Слушатели —
+## подсказки взаимодействия в мире («F — Обыскать» и т.п.) — обновляют текст клавиши.
+signal bindings_changed()
 
 func _ready() -> void:
 	load_settings()
@@ -39,6 +42,7 @@ func apply_and_save(mode: int, bindings: Dictionary) -> void:
 		_apply_binding(str(action), int(bindings[action]))
 	_save_to_disk(bindings)
 	movement_mode_changed.emit(int(movement_mode))
+	bindings_changed.emit()
 
 ## Возвращает физический keycode клавиши, назначенной на [param action] в текущем InputMap
 ## (0 если это действие без клавиши — например, привязано к кнопке мыши).
@@ -50,6 +54,14 @@ func current_binding(action: String) -> int:
 			var key := ev as InputEventKey
 			return key.physical_keycode if key.physical_keycode != 0 else key.keycode
 	return 0
+
+## Человекочитаемое имя клавиши, назначенной на [param action] сейчас (для подсказок в
+## мире). Если у действия нет клавиши — возвращает [param fallback].
+func action_key_label(action: String, fallback: String = "—") -> String:
+	var keycode := current_binding(action)
+	if keycode == 0:
+		return fallback
+	return keycode_label(keycode)
 
 ## Человекочитаемое имя клавиши по её физическому keycode (для текущей раскладки).
 static func keycode_label(physical_keycode: int) -> String:
