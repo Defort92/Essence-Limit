@@ -45,7 +45,10 @@ func _rebuild_buy_list() -> void:
 func _rebuild_sell_list() -> void:
 	for child in _sell_list.get_children():
 		child.queue_free()
-	for slot: Dictionary in InventorySystem.get_slots():
+	var inv := PartySystem.get_active_inventory()
+	if inv == null:
+		return
+	for slot: Dictionary in inv.get_slots():
 		var item: ItemData = slot.item
 		if item.sell_price <= 0:
 			continue

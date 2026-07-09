@@ -27,6 +27,7 @@ func _on_body_entered(body: Node3D) -> void:
 	if item == null:
 		return
 
-	if InventorySystem.add_item(item, quantity):
+	var inv := PartySystem.get_active_inventory()
+	if inv != null and inv.add_item(item, quantity):
 		picked_up.emit(self)
 		queue_free()

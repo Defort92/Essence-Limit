@@ -15,14 +15,17 @@ func _ready() -> void:
 	screen_group = "loot_ui"
 	close_action = "interact"
 	super._ready()
-	# Взятие предмета меняет рюкзак; если он переполнился — обновляем доступность строк.
-	InventorySystem.inventory_changed.connect(_on_inventory_changed)
 
 ## Открывает обыск тела [param source] и ставит игру на паузу.
 func open(source: LootableCorpse) -> void:
 	_source = source
 	if not source.loot_changed.is_connected(_on_source_changed):
 		source.loot_changed.connect(_on_source_changed)
+	# Лут уходит в рюкзак активного (сейчас управляемого) персонажа — подписываемся на его
+	# инвентарь, чтобы обновить доступность строк, если он переполнился по ходу разбора.
+	var inv := PartySystem.get_active_inventory()
+	if inv != null and not inv.inventory_changed.is_connected(_on_inventory_changed):
+		inv.inventory_changed.connect(_on_inventory_changed)
 	_title_label.text = source.corpse_name
 	_refresh()
 	_show_modal()
@@ -36,6 +39,9 @@ func _before_close() -> void:
 		if _source.is_empty():
 			_source.despawn()
 	_source = null
+	var inv := PartySystem.get_active_inventory()
+	if inv != null and inv.inventory_changed.is_connected(_on_inventory_changed):
+		inv.inventory_changed.disconnect(_on_inventory_changed)
 
 func _on_source_changed() -> void:
 	_refresh()

@@ -4,6 +4,7 @@
 ## эссенции в них не теряются, но и не дают статов. UI отображает их как locked.
 ## Компонент на каждого участника отряда — дочерний узел "Essence" в player.tscn.
 ## У каждого персонажа свои слоты эссенций, доступ через Player.essence.
+## Эссенция берётся из рюкзака ТОГО ЖЕ персонажа (см. _inventory()).
 extends Node
 class_name EssenceSystem
 
@@ -48,11 +49,11 @@ func is_slot_locked(slot_index: int) -> bool:
 ## Атомарно удаляет из инвентаря и устанавливает в слот.
 ## Возвращает [code]false[/code] если предмета нет или все активные слоты заняты.
 func equip_from_inventory(essence: EssenceData) -> bool:
-	if not InventorySystem.has_item(essence.id):
+	if not _inventory().has_item(essence.id):
 		return false
 	if not equip(essence):
 		return false
-	InventorySystem.remove_item(essence.id, 1)
+	_inventory().remove_item(essence.id, 1)
 	return true
 
 ## Вставляет [param essence] напрямую (без удаления из рюкзака).
@@ -86,6 +87,10 @@ func remove(slot_index: int) -> bool:
 
 ## Возвращает суммарный бонус стата [param stat_name] только от эссенций в активных слотах.
 ## Заблокированные слоты (индекс >= _active_slot_count) не учитываются.
+## Рюкзак владельца этого компонента (Essence — всегда дочерний узел своего Player).
+func _inventory() -> InventoryComponent:
+	return (get_parent() as Player).inventory
+
 func get_total_stat(stat_name: String) -> int:
 	var total := 0
 	for idx in _active_slot_count:

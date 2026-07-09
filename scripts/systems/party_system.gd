@@ -24,6 +24,7 @@ const COMPANION_SCENE_PATH := "res://scenes/characters/player.tscn"
 ## race:int, name:String, trust:int, role:int (CompanionData.Role),
 ## health:int (-1 = полное HP),
 ## quick_slots:Array, equipment:Dictionary (EquipmentManager.serialize),
+## inventory:Array (InventoryComponent.serialize — личный рюкзак, включая золото-предмет),
 ## essence_bonus_slots:int, essences:Array (пути ресурсов или null).
 var roster: Array[Dictionary] = []
 var members: Array[Player] = []
@@ -125,6 +126,13 @@ func get_active_member() -> Player:
 	if active_index < 0 or active_index >= members.size():
 		return null
 	return members[active_index]
+
+## Рюкзак активного участника. У каждого персонажа свой инвентарь (Player.inventory) —
+## лут с монстров, находки и покупки у торговца по умолчанию попадают именно сюда.
+## null, если активного участника нет (отряд вайпнут).
+func get_active_inventory() -> InventoryComponent:
+	var member := get_active_member()
+	return member.inventory if member != null else null
 
 ## Передаёт управление участнику с индексом [param index] в members. Не действует,
 ## если он мёртв или уже активен.
@@ -230,6 +238,7 @@ func _store_member_state(member: Player) -> void:
 	entry["health"] = -1 if member.state == Player.State.DEAD else member.health
 	entry["quick_slots"] = member.quick_slots.duplicate()
 	entry["equipment"] = member.equipment.serialize()
+	entry["inventory"] = member.inventory.serialize()
 	entry["essence_bonus_slots"] = member.essence.bonus_slots
 	var essence_paths := []
 	for slot_essence in member.essence.slots:
@@ -270,6 +279,7 @@ func _make_roster_entry(race: int, member_name: String, trust: int, role: int = 
 		"health": -1,
 		"quick_slots": ["", "", "", ""],
 		"equipment": {},
+		"inventory": [],
 		"essence_bonus_slots": 0,
 		"essences": [],
 	}

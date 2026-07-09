@@ -1,7 +1,7 @@
 [gd_scene load_steps=10 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/death_screen.gd" id="1_script"]
-[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+[ext_resource type="FontFile" path="res://assets/fonts/RubikPixels-Regular.ttf" id="2_rubik"]
 
 [sub_resource type="Gradient" id="Gradient_bg"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -48,8 +48,8 @@ border_width_bottom = 2
 border_color = Color(0.706, 0.196, 0.141, 0.6)
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
-base_font = ExtResource("2_forum")
-spacing_glyph = 20
+base_font = ExtResource("2_rubik")
+spacing_glyph = 3
 
 [node name="DeathScreen" type="Control"]
 layout_mode = 3

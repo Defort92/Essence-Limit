@@ -40,6 +40,12 @@ const ACTION_LABELS := {
 	"states": "Состояния",
 }
 
+## Действия, сознательно НЕ показываемые здесь — привязаны к мыши (attack/block) или это
+## служебный "pause" (Esc), который не переназначается. Любое другое действие из InputMap,
+## которого нет ни здесь, ни в MOVEMENT_ACTIONS/COMMON_ACTIONS, считается забытым — см.
+## _warn_about_unlisted_actions().
+const EXCLUDED_ACTIONS: Array = ["attack", "block", "pause"]
+
 @onready var _mode_switch: CheckButton = $Panel/Margin/VBoxContainer/ModeRow/ModeSwitch
 @onready var _mode_value: Label = $Panel/Margin/VBoxContainer/ModeRow/ModeValueLabel
 @onready var _mode_hint: Label = $Panel/Margin/VBoxContainer/ModeHint
@@ -70,6 +76,8 @@ func _ready() -> void:
 	_back_button.pressed.connect(_on_back_pressed)
 	_confirm_save.pressed.connect(_on_confirm_save_pressed)
 	_confirm_back.pressed.connect(_on_confirm_back_pressed)
+	if OS.is_debug_build():
+		_warn_about_unlisted_actions()
 
 ## Загружает текущие настройки в черновик и показывает панель.
 func open() -> void:
@@ -86,6 +94,24 @@ func open() -> void:
 
 func _all_actions() -> Array:
 	return MOVEMENT_ACTIONS + COMMON_ACTIONS
+
+## Предохранитель от забытых клавиш: любое собственное действие проекта (не встроенное
+## "ui_*" из Godot), которого нет ни в списке экрана настроек, ни в EXCLUDED_ACTIONS,
+## печатается предупреждением в консоль. Так при добавлении нового действия в InputMap
+## (Project Settings → Input Map или напрямую в project.godot) разработчик сразу увидит,
+## что забыл добавить его в COMMON_ACTIONS/ACTION_LABELS этого экрана — только для debug-сборок.
+func _warn_about_unlisted_actions() -> void:
+	var known := {}
+	for action in _all_actions():
+		known[action] = true
+	for action in EXCLUDED_ACTIONS:
+		known[action] = true
+	for action in InputMap.get_actions():
+		var action_name := str(action)
+		if action_name.begins_with("ui_"):
+			continue
+		if not known.has(action_name):
+			push_warning("ControlsSettings: действие '%s' есть в InputMap, но не отображается в меню настроек управления. Добавь его в COMMON_ACTIONS/ACTION_LABELS (scripts/ui/controls_settings.gd) или в EXCLUDED_ACTIONS, если оно намеренно не переназначается." % action_name)
 
 ## Действия, показываемые/редактируемые в текущем режиме бега.
 func _visible_actions() -> Array:

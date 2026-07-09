@@ -2,8 +2,8 @@
 ## настройки (громкость, полноэкранный режим), выход.
 extends Control
 
-@onready var _new_game_button: Button = $CenterContainer/VBoxContainer/ButtonsContainer/NewGameButton
-@onready var _continue_button: Button = $CenterContainer/VBoxContainer/ButtonsContainer/ContinueButton
+@onready var _new_game_button: Button = $LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/NewGameButton
+@onready var _continue_button: Button = $LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/ContinueButton
 @onready var _settings_overlay: Control = $SettingsOverlay
 @onready var _volume_slider: HSlider = $SettingsOverlay/Panel/Margin/VBoxContainer/VolumeSlider
 @onready var _volume_value_label: Label = $SettingsOverlay/Panel/Margin/VBoxContainer/VolumeRow/VolumeValueLabel

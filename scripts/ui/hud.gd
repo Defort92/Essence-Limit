@@ -21,11 +21,15 @@ const TIMER_COLOR: Color = Color(0.604, 0.545, 0.494)
 const TOAST_BG: Color = Color(0.039, 0.031, 0.035, 0.82)
 const ROW_BG: Color = Color(0.078, 0.063, 0.055, 0.4)
 
+const PORTRAIT_BG: Color = Color(0.086, 0.067, 0.067)
+const PORTRAIT_BORDER: Color = Color(0.725, 0.541, 0.369, 0.8)
+
 @onready var hp_bar: ProgressBar = $Control/TopLeft/HPContainer/HPBar
 @onready var hp_text: Label = $Control/TopLeft/HPContainer/HPText
 @onready var _gold_badge: PanelContainer = $Control/GoldBadge
 @onready var _gold_value: Label = $Control/GoldBadge/Row/GoldValue
 @onready var level_label: Label = $Control/TopLeft/LevelLabel
+@onready var _player_portrait: Control = $Control/PlayerPortrait
 @onready var _status_panel: PanelContainer = $Control/StatusPanel
 @onready var _header_row: HBoxContainer = $Control/StatusPanel/Root/Header
 @onready var _buff_count: Label = $Control/StatusPanel/Root/Header/BuffCount
@@ -46,6 +50,8 @@ var _refresh_accum: float = 0.0
 var _expanded: bool = false
 ## source_id уже показанных статусов — чтобы тост всплывал только на новое наложение.
 var _seen_ids: Dictionary = {}
+## Картинка портрета активного игрока в TopLeft (обновляется при смене активного участника).
+var _player_portrait_image: TextureRect = null
 ## Активные тосты ленты в порядке появления (FIFO при переполнении MAX_TOASTS).
 var _toast_nodes: Array[Control] = []
 
@@ -63,6 +69,7 @@ func _ready() -> void:
 	_header_row.gui_input.connect(_on_header_input)
 	_show_all_btn.pressed.connect(_open_states_modal)
 	_build_badge_styles()
+	_build_player_portrait()
 	_apply_expanded_state()
 	_location_banner.set_world_location(location_name)
 	call_deferred("_connect_player")
@@ -147,6 +154,7 @@ func _subscribe_to_player(player: Player) -> void:
 		player.health_changed.connect(_on_health_changed)
 	_on_health_changed(player.health, player.max_health)
 	_status_member = player
+	_update_player_portrait(player)
 	if not player.statuses.statuses_changed.is_connected(_on_statuses_changed):
 		player.statuses.statuses_changed.connect(_on_statuses_changed)
 	# Первичное наполнение считаем «уже виденным», чтобы стартовые статусы не сыпались тостами.
@@ -163,6 +171,57 @@ func _on_gold_changed(amount: int) -> void:
 
 func _on_level_up(new_level: int) -> void:
 	level_label.text = "Ур. %d" % new_level
+
+# ─── Портрет активного игрока (TopLeft) ─────────────────────────────────────
+
+## Кликабельный портрет активного игрока: рамка + фон строятся один раз здесь,
+## сама картинка (_player_portrait_image) обновляется в _update_player_portrait
+## при подписке/смене активного участника (см. _subscribe_to_player).
+func _build_player_portrait() -> void:
+	_player_portrait.mouse_filter = Control.MOUSE_FILTER_STOP
+	_player_portrait.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	_player_portrait.gui_input.connect(_on_player_portrait_input)
+
+	var bg := ColorRect.new()
+	bg.color = PORTRAIT_BG
+	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_player_portrait.add_child(bg)
+
+	_player_portrait_image = TextureRect.new()
+	_player_portrait_image.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_player_portrait_image.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	_player_portrait_image.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_player_portrait_image.clip_contents = true
+	_player_portrait_image.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_player_portrait.add_child(_player_portrait_image)
+
+	var border := Panel.new()
+	border.set_anchors_preset(Control.PRESET_FULL_RECT)
+	border.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0, 0, 0, 0)
+	style.set_border_width_all(2)
+	style.border_color = PORTRAIT_BORDER
+	border.add_theme_stylebox_override("panel", style)
+	_player_portrait.add_child(border)
+
+func _update_player_portrait(player: Player) -> void:
+	if _player_portrait_image == null or player == null:
+		return
+	var sprite := player.get_node_or_null("Sprite3D") as DirectionalSprite3D
+	_player_portrait_image.texture = sprite.tex_front if sprite != null else null
+
+func _on_player_portrait_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_open_character_screen(_status_member)
+
+## Общая точка открытия экрана персонажа/инвентаря по клику (портрет игрока здесь,
+## портреты союзников — party_panel.gd). [param member] — null открывает на активном.
+func _open_character_screen(member: Player) -> void:
+	var modal := get_tree().get_first_node_in_group("character_screen")
+	if modal != null and modal.has_method("open"):
+		modal.open(member)
 
 # ─── Панель состояний ────────────────────────────────────────────────────────
 

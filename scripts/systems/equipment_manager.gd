@@ -5,6 +5,8 @@
 ## Починка доступна у ремесленника в городе за золото.
 ## Компонент на каждого участника отряда — дочерний узел "Equipment" в player.tscn.
 ## У каждого персонажа своё снаряжение, доступ через Player.equipment.
+## Снятое/надеваемое снаряжение уходит в рюкзак ТОГО ЖЕ персонажа (см. _inventory()) —
+## рюкзаки у каждого свои, общего на отряд больше нет.
 extends Node
 class_name EquipmentManager
 
@@ -33,11 +35,11 @@ signal item_broke(slot: int, item: EquipmentData)
 ## Используй этот метод из UI — он атомарно делает remove из инвентаря и equip.
 ## Возвращает [code]false[/code] если предмета нет в рюкзаке или аксессуарный список полон.
 func equip_from_inventory(item: EquipmentData) -> bool:
-	if not InventorySystem.has_item(item.id):
+	if not _inventory().has_item(item.id):
 		return false
 	if not equip(item):
 		return false
-	InventorySystem.remove_item(item.id, 1)
+	_inventory().remove_item(item.id, 1)
 	return true
 
 ## Надевает [param item] напрямую (без удаления из рюкзака).
@@ -73,7 +75,7 @@ func unequip_slot(slot: EquipmentData.Slot) -> bool:
 	if not _equipped.has(slot):
 		return false
 	var item: EquipmentData = _equipped[slot]
-	if not InventorySystem.add_item(item):
+	if not _inventory().add_item(item):
 		return false
 	_equipped.erase(slot)
 	_broken_slots.erase(slot)
@@ -87,13 +89,39 @@ func unequip_accessory(index: int) -> bool:
 	if index < 0 or index >= _accessories.size():
 		return false
 	var item: EquipmentData = _accessories[index]
-	if not InventorySystem.add_item(item):
+	if not _inventory().add_item(item):
 		return false
 	_accessories.remove_at(index)
 	_broken_accessories.remove_at(index)
 	item_unequipped.emit(EquipmentData.Slot.ACCESSORY, item)
 	equipment_changed.emit()
 	return true
+
+## Снимает предмет со слота [param slot] без возврата в чей-либо рюкзак — вызывающий сам
+## решает, куда положить предмет. Нужно для лута с трупа: LootableCorpse кладёт снятое
+## в рюкзак активного мародёра, а не автоматически обратно покойнику (unequip_slot всегда
+## кладёт в рюкзак ВЛАДЕЛЬЦА этой экипировки — для мёртвого союзника это не то, что нужно).
+## Возвращает [code]null[/code], если слот пуст или это ACCESSORY (см. take_accessory).
+func take_from_slot(slot: EquipmentData.Slot) -> EquipmentData:
+	if slot == EquipmentData.Slot.ACCESSORY or not _equipped.has(slot):
+		return null
+	var item: EquipmentData = _equipped[slot]
+	_equipped.erase(slot)
+	_broken_slots.erase(slot)
+	item_unequipped.emit(slot, item)
+	equipment_changed.emit()
+	return item
+
+## Снимает аксессуар по позиции [param index] без возврата в чей-либо рюкзак — см. take_from_slot.
+func take_accessory(index: int) -> EquipmentData:
+	if index < 0 or index >= _accessories.size():
+		return null
+	var item: EquipmentData = _accessories[index]
+	_accessories.remove_at(index)
+	_broken_accessories.remove_at(index)
+	item_unequipped.emit(EquipmentData.Slot.ACCESSORY, item)
+	equipment_changed.emit()
+	return item
 
 ## Возвращает надетый предмет в слоте [param slot], или [code]null[/code] если слот пуст.
 func get_equipped(slot: EquipmentData.Slot) -> EquipmentData:
@@ -262,6 +290,10 @@ func deserialize(data: Dictionary) -> void:
 
 	equipment_changed.emit()
 
+## Рюкзак владельца этого компонента (Equipment — всегда дочерний узел своего Player).
+func _inventory() -> InventoryComponent:
+	return (get_parent() as Player).inventory
+
 # Снимает предмет из слота и кладёт в рюкзак без эмита equipment_changed.
 func _displace_slot(slot: EquipmentData.Slot) -> void:
 	if not _equipped.has(slot):
@@ -269,5 +301,5 @@ func _displace_slot(slot: EquipmentData.Slot) -> void:
 	var old_item: EquipmentData = _equipped[slot]
 	_equipped.erase(slot)
 	_broken_slots.erase(slot)
-	InventorySystem.add_item(old_item)
+	_inventory().add_item(old_item)
 	item_unequipped.emit(slot, old_item)

@@ -26,9 +26,8 @@ func save(slot: int) -> void:
 			"current_level": XPSystem.current_level,
 			"killed_mob_types": XPSystem.killed_mob_types.duplicate(),
 		},
-		# Весь отряд: у каждого участника своя экипировка, эссенции, HP, доверие.
+		# Весь отряд: у каждого участника своя экипировка, эссенции, рюкзак (и золото в нём), HP, доверие.
 		"party": PartySystem.serialize(),
-		"inventory": InventorySystem.serialize(),
 		"stash": StashSystem.serialize(),
 		"racial_passives": RacialPassiveSystem.serialize(),
 		"achievements": AchievementSystem.serialize(),
@@ -97,15 +96,14 @@ func _apply_save(save_data: Dictionary) -> void:
 	var player_data: Dictionary = save_data.get("player", {})
 	GameManager.player_race = player_data.get("race", 0) as GameManager.Race
 	GameManager.player_name = player_data.get("player_name", "")
-	GameManager.gold = player_data.get("gold", 0)
-	GameManager.gold_changed.emit(GameManager.gold)
+	# Золото больше не отдельное поле — оно хранится как предмет в рюкзаке каждого
+	# участника и восстанавливается вместе с ним через PartySystem.deserialize() ниже.
 
 	var xp_data: Dictionary = save_data.get("xp", {})
 	XPSystem.current_xp = xp_data.get("current_xp", 0)
 	XPSystem.current_level = xp_data.get("current_level", 1)
 	XPSystem.killed_mob_types = xp_data.get("killed_mob_types", {})
 
-	InventorySystem.deserialize(save_data.get("inventory", []))
 	StashSystem.deserialize(save_data.get("stash", []))
 	RacialPassiveSystem.deserialize(save_data.get("racial_passives", []))
 	AchievementSystem.deserialize(save_data.get("achievements", {}))

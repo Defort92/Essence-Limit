@@ -1,7 +1,10 @@
-## Рюкзак игрока (до MAX_SLOTS ячеек).
+## Личный рюкзак одного персонажа (до MAX_SLOTS ячеек).
 ## Каждая ячейка — словарь { item: ItemData, quantity: int }.
-## Является Autoload-синглтоном; регистрировать как "InventorySystem" в Project Settings.
+## Компонент на каждого участника отряда — дочерний узел "Inventory" в player.tscn.
+## У каждого персонажа свой рюкзак, доступ через Player.inventory (см. PartySystem.get_active_inventory()
+## для "рюкзака активного персонажа", куда по умолчанию попадают лут/находки/покупки).
 extends Node
+class_name InventoryComponent
 
 const MAX_SLOTS: int = 30
 

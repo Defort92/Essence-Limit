@@ -84,26 +84,28 @@ func get_slots() -> Array:
 func is_full() -> bool:
 	return _slots.size() >= MAX_SLOTS
 
-## Перемещает [param quantity] единиц предмета из рюкзака в хранилище.
+## Перемещает [param quantity] единиц предмета из рюкзака активного персонажа в хранилище.
 ## Вызывать только когда player.is_in_town == true.
 func deposit(item_id: String, quantity: int = 1) -> bool:
-	if not InventorySystem.has_item(item_id, quantity):
+	var inv := PartySystem.get_active_inventory()
+	if inv == null or not inv.has_item(item_id, quantity):
 		return false
-	for slot in InventorySystem.get_slots():
+	for slot in inv.get_slots():
 		if slot.item.id == item_id:
 			if add_item(slot.item, quantity):
-				InventorySystem.remove_item(item_id, quantity)
+				inv.remove_item(item_id, quantity)
 				return true
 	return false
 
-## Перемещает [param quantity] единиц предмета из хранилища в рюкзак.
+## Перемещает [param quantity] единиц предмета из хранилища в рюкзак активного персонажа.
 ## Вызывать только когда player.is_in_town == true.
 func withdraw(item_id: String, quantity: int = 1) -> bool:
-	if InventorySystem.is_full():
+	var inv := PartySystem.get_active_inventory()
+	if inv == null or inv.is_full():
 		return false
 	for slot in _slots:
 		if slot.item.id == item_id:
-			if InventorySystem.add_item(slot.item, quantity):
+			if inv.add_item(slot.item, quantity):
 				remove_item(item_id, quantity)
 				return true
 	return false

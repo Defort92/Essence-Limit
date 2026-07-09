@@ -7,6 +7,7 @@
 [ext_resource type="Resource" uid="uid://buqrmtu56x0k7" path="res://resources/enemies/goblin.tres" id="5"]
 [ext_resource type="PackedScene" path="res://scenes/ui/loot_ui.tscn" id="6"]
 [ext_resource type="PackedScene" path="res://scenes/ui/states_screen.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/ui/character_screen.tscn" id="17"]
 [ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="8"]
 [ext_resource type="Script" path="res://scripts/systems/mob_spawner.gd" id="9"]
 [ext_resource type="Script" path="res://scripts/components/healing_aura.gd" id="10"]
@@ -74,6 +75,8 @@ location_name = "Испытательный полигон"
 [node name="Goblin" parent="." unique_id=1353285753 instance=ExtResource("4")]
 transform = Transform3D(1, 0, 0, 0, 0.99999905, 0.0013438966, 0, -0.0013438966, 0.99999905, 5, 0, 0)
 data = ExtResource("5")
+
+[node name="CharacterScreen" parent="." instance=ExtResource("17")]
 
 [node name="StatesScreen" parent="." instance=ExtResource("7")]
 

@@ -1,7 +1,7 @@
 ## Экран персонажа: экипировка, рюкзак, эссенции — в одном окне.
 ## Одно и то же окно показывает ЛЮБОГО участника отряда — вкладки в MemberTabsRow
-## переключают, чьи данные отображаются (_target_member). Рюкзак общий на отряд,
-## экипировка и эссенции — свои у каждого (см. Player.equipment/essence).
+## переключают, чьи данные отображаются (_target_member). Рюкзак, экипировка и эссенции —
+## свои у каждого персонажа (см. Player.inventory/equipment/essence).
 ## Открывается/закрывается клавишей "inventory" (I). Каркас модалки — в UIModalScreen.
 extends UIModalScreen
 
@@ -32,15 +32,16 @@ func _ready() -> void:
 	screen_group = "character_screen"
 	close_action = "inventory"
 	super._ready()
-	InventorySystem.inventory_changed.connect(_on_state_changed)
 
 ## Клавиша "inventory" при скрытом экране открывает его (экран-переключатель).
 func _on_action_while_hidden() -> void:
 	open()
 	get_viewport().set_input_as_handled()
 
-func open() -> void:
-	_select_member(PartySystem.get_active_member())
+## [param member] — кого показать сразу (клик по портрету в HUD/панели отряда).
+## По умолчанию (null) — активный участник, как при открытии клавишей "inventory".
+func open(member: Player = null) -> void:
+	_select_member(member if member != null else PartySystem.get_active_member())
 	_show_modal()
 
 func _on_state_changed() -> void:
@@ -57,11 +58,15 @@ func _select_member(member: Player) -> void:
 			_target_member.equipment.equipment_changed.disconnect(_on_state_changed)
 		if _target_member.essence.slots_changed.is_connected(_on_state_changed):
 			_target_member.essence.slots_changed.disconnect(_on_state_changed)
+		if _target_member.inventory.inventory_changed.is_connected(_on_state_changed):
+			_target_member.inventory.inventory_changed.disconnect(_on_state_changed)
 	_target_member = member
 	if not _target_member.equipment.equipment_changed.is_connected(_on_state_changed):
 		_target_member.equipment.equipment_changed.connect(_on_state_changed)
 	if not _target_member.essence.slots_changed.is_connected(_on_state_changed):
 		_target_member.essence.slots_changed.connect(_on_state_changed)
+	if not _target_member.inventory.inventory_changed.is_connected(_on_state_changed):
+		_target_member.inventory.inventory_changed.connect(_on_state_changed)
 	_rebuild_member_tabs()
 	_refresh()
 
@@ -136,7 +141,7 @@ func _rebuild_inventory_list() -> void:
 
 	var target_equipment: EquipmentManager = _target_member.equipment
 	var target_essence: EssenceSystem = _target_member.essence
-	for slot: Dictionary in InventorySystem.get_slots():
+	for slot: Dictionary in _target_member.inventory.get_slots():
 		var item: ItemData = slot.item
 		var quantity: int = slot.quantity
 		var label_text: String = "%s x%d" % [item.display_name, quantity]

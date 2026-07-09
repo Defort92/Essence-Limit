@@ -1,4 +1,4 @@
-[gd_scene load_steps=15 format=3 uid="uid://o0kyfh8ytad1"]
+[gd_scene load_steps=16 format=3 uid="uid://o0kyfh8ytad1"]
 
 [ext_resource type="Script" uid="uid://c8m52272kpxn0" path="res://scripts/entities/player.gd" id="1"]
 [ext_resource type="Script" path="res://scripts/components/directional_sprite.gd" id="2"]
@@ -6,6 +6,7 @@
 [ext_resource type="Script" path="res://scripts/systems/essence_system.gd" id="12"]
 [ext_resource type="Script" path="res://scripts/systems/ability_manager.gd" id="13"]
 [ext_resource type="Script" path="res://scripts/components/status_component.gd" id="14"]
+[ext_resource type="Script" path="res://scripts/systems/inventory_system.gd" id="15"]
 [ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front.png" id="3"]
 [ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front-right.png" id="4"]
 [ext_resource type="Texture2D" path="res://assets/sprites/characters/base/full_right.png" id="5"]
@@ -54,3 +55,6 @@ script = ExtResource("13")
 
 [node name="Statuses" type="Node" parent="."]
 script = ExtResource("14")
+
+[node name="Inventory" type="Node" parent="."]
+script = ExtResource("15")

@@ -83,7 +83,11 @@ func _build_card(member: Player) -> Control:
 	var portrait := Control.new()
 	portrait.custom_minimum_size = Vector2(PORTRAIT_SIZE, PORTRAIT_SIZE)
 	portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
-	portrait.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# STOP (не IGNORE, как у остальных декоративных детей карточки) — портрет кликабелен,
+	# открывает экран персонажа/инвентаря для этого союзника.
+	portrait.mouse_filter = Control.MOUSE_FILTER_STOP
+	portrait.mouse_default_cursor_shape = Control.CURSOR_POINTING_HAND
+	portrait.gui_input.connect(_on_portrait_input.bind(member))
 
 	var bg := _make_portrait_image(member)
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -209,6 +213,13 @@ func _update_values(members: Array[Player]) -> void:
 		hp_fill.anchor_right = ratio
 		hp_fill.offset_right = 0
 		hp_fill.color = HP_LOW_FILL if ratio < HP_LOW_THRESHOLD else HP_FILL
+
+## Клик по портрету союзника — открыть экран персонажа/инвентаря сразу на нём.
+func _on_portrait_input(event: InputEvent, member: Player) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		var modal := get_tree().get_first_node_in_group("character_screen")
+		if modal != null and modal.has_method("open"):
+			modal.open(member)
 
 func _morale_for(trust: int) -> Dictionary:
 	for tier in MORALE_TIERS:

@@ -5,7 +5,7 @@
 ##  - Враг: плоский список предметов (loot_items) + золото (loot_gold). Сам враг уже
 ##    удалён из сцены, лут был скатан в его _die() — контейнер просто хранит результат.
 ##  - Павший союзник: ссылка на его Player-узел (source_player). Предметы берутся прямо из
-##    его экипировки; «взять» = снять слот (уходит в общий рюкзак через EquipmentManager).
+##    его экипировки; «взять» = снять слот (уходит в рюкзак активного персонажа через EquipmentManager).
 ##    Экипировку НЕ копируем заранее: незалутанное снаряжение остаётся на союзнике и
 ##    переживёт его возрождение при смене сцены (см. PartySystem._store_member_state).
 extends Area3D
@@ -165,30 +165,44 @@ func get_loot_entries() -> Array:
 			})
 	return entries
 
-## Перекладывает запись [param entry] в общий рюкзак. Возвращает [code]false[/code],
-## если рюкзак полон (предмет остаётся в теле).
+## Перекладывает запись [param entry] в рюкзак активного (управляемого игроком) мародёра.
+## Возвращает [code]false[/code], если рюкзака нет или он полон (предмет остаётся в теле).
 func take_entry(entry: Dictionary) -> bool:
 	var taken := false
+	var inv := PartySystem.get_active_inventory()
 	match entry.kind:
 		"item":
 			var idx: int = entry.key
 			if idx < 0 or idx >= loot_items.size():
 				return false
 			var slot: Dictionary = loot_items[idx]
-			if InventorySystem.add_item(slot.item, int(slot.quantity)):
+			if inv != null and inv.add_item(slot.item, int(slot.quantity)):
 				loot_items.remove_at(idx)
 				taken = true
 		"equip_slot":
-			# unequip_slot сам кладёт предмет в общий рюкзак (или вернёт false если полон).
-			taken = source_player != null and is_instance_valid(source_player) \
-				and source_player.equipment.unequip_slot(entry.key)
+			# take_from_slot снимает без авто-возврата покойнику — кладём мародёру сами.
+			taken = _take_equipment(inv, func() -> EquipmentData: return source_player.equipment.take_from_slot(entry.key), \
+				func(item: EquipmentData) -> void: source_player.equipment.equip(item))
 		"equip_acc":
-			taken = source_player != null and is_instance_valid(source_player) \
-				and source_player.equipment.unequip_accessory(entry.key)
+			taken = _take_equipment(inv, func() -> EquipmentData: return source_player.equipment.take_accessory(entry.key), \
+				func(item: EquipmentData) -> void: source_player.equipment.equip(item))
 	if taken:
 		loot_changed.emit()
 		_update_prompt()
 	return taken
+
+## Снимает предмет с покойника через [param take_fn] и кладёт в [param inv] мародёра.
+## Если рюкзак мародёра полон — надевает предмет обратно на покойника через [param restore_fn].
+func _take_equipment(inv: InventoryComponent, take_fn: Callable, restore_fn: Callable) -> bool:
+	if source_player == null or not is_instance_valid(source_player):
+		return false
+	var item: EquipmentData = take_fn.call()
+	if item == null:
+		return false
+	if inv != null and inv.add_item(item):
+		return true
+	restore_fn.call(item)
+	return false
 
 ## Забирает всё, что помещается в рюкзак. Останавливается, когда рюкзак полон.
 func take_all() -> void:

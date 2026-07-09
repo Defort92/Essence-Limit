@@ -2,12 +2,12 @@
 
 [ext_resource type="Script" uid="uid://d26o58g35wyae" path="res://scripts/ui/hud.gd" id="1_hud"]
 [ext_resource type="Script" path="res://scripts/ui/components/minimap.gd" id="3_minimap"]
-[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+[ext_resource type="FontFile" path="res://assets/fonts/DotGothic16-Regular.ttf" id="2_dotgothic"]
 [ext_resource type="Script" path="res://scripts/ui/components/location_banner.gd" id="4_banner"]
 [ext_resource type="Script" path="res://scripts/ui/components/party_panel.gd" id="5_party"]
 
 [sub_resource type="FontVariation" id="FontVariation_hud"]
-base_font = ExtResource("2_forum")
+base_font = ExtResource("2_dotgothic")
 spacing_glyph = 1
 
 [sub_resource type="StyleBoxFlat" id="StyleBoxFlat_gold_badge"]
@@ -52,11 +52,18 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="TopLeft" type="VBoxContainer" parent="Control"]
+[node name="PlayerPortrait" type="Control" parent="Control"]
 layout_mode = 1
 offset_left = 22.0
 offset_top = 22.0
-offset_right = 322.0
+offset_right = 80.0
+offset_bottom = 80.0
+
+[node name="TopLeft" type="VBoxContainer" parent="Control"]
+layout_mode = 1
+offset_left = 92.0
+offset_top = 22.0
+offset_right = 392.0
 offset_bottom = 80.0
 theme_override_constants/separation = 7
 

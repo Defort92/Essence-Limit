@@ -1,7 +1,7 @@
-[gd_scene load_steps=16 format=3]
+[gd_scene load_steps=14 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/main_menu.gd" id="1_script"]
-[ext_resource type="FontFile" path="res://assets/fonts/Forum-Regular.ttf" id="2_forum"]
+[ext_resource type="FontFile" path="res://assets/fonts/RubikPixels-Regular.ttf" id="2_rubik"]
 [ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="9_sep"]
 
 [sub_resource type="Gradient" id="Gradient_bg"]
@@ -52,38 +52,18 @@ corner_radius_top_right = 260
 corner_radius_bottom_right = 260
 corner_radius_bottom_left = 260
 
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sigil_outer"]
-draw_center = false
-border_width_left = 2
-border_width_top = 2
-border_width_right = 2
-border_width_bottom = 2
-border_color = Color(0.706, 0.549, 0.275, 0.55)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sigil_inner"]
-draw_center = false
-border_width_left = 1
-border_width_top = 1
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_left_panel"]
+bg_color = Color(0.078, 0.055, 0.047, 1)
 border_width_right = 1
-border_width_bottom = 1
-border_color = Color(0.588, 0.212, 0.141, 0.7)
-
-[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_sigil_dot"]
-bg_color = Color(0.878, 0.698, 0.416, 1)
-corner_radius_top_left = 5
-corner_radius_top_right = 5
-corner_radius_bottom_right = 5
-corner_radius_bottom_left = 5
-shadow_color = Color(0.878, 0.588, 0.353, 0.7)
-shadow_size = 7
+border_color = Color(0.471, 0.376, 0.212, 0.35)
 
 [sub_resource type="FontVariation" id="FontVariation_title"]
-base_font = ExtResource("2_forum")
-spacing_glyph = 24
+base_font = ExtResource("2_rubik")
+spacing_glyph = 2
 
 [sub_resource type="FontVariation" id="FontVariation_settings_title"]
-base_font = ExtResource("2_forum")
-spacing_glyph = 5
+base_font = ExtResource("2_rubik")
+spacing_glyph = 1
 
 [node name="MainMenu" type="Control"]
 layout_mode = 3
@@ -107,10 +87,10 @@ expand_mode = 1
 [node name="PortalGlow" type="TextureRect" parent="."]
 layout_mode = 1
 anchors_preset = 0
-anchor_left = 0.5
-anchor_top = 0.38
-anchor_right = 0.5
-anchor_bottom = 0.38
+anchor_left = 0.68
+anchor_top = 0.42
+anchor_right = 0.68
+anchor_bottom = 0.42
 offset_left = -410.0
 offset_top = -410.0
 offset_right = 410.0
@@ -121,10 +101,10 @@ expand_mode = 1
 [node name="EssenceRing" type="Panel" parent="."]
 layout_mode = 1
 anchors_preset = 0
-anchor_left = 0.5
-anchor_top = 0.38
-anchor_right = 0.5
-anchor_bottom = 0.38
+anchor_left = 0.68
+anchor_top = 0.42
+anchor_right = 0.68
+anchor_bottom = 0.42
 offset_left = -260.0
 offset_top = -260.0
 offset_right = 260.0
@@ -141,148 +121,120 @@ grow_vertical = 2
 texture = SubResource("GradientTexture2D_vignette")
 expand_mode = 1
 
-[node name="CenterContainer" type="CenterContainer" parent="."]
+[node name="LeftPanel" type="Panel" parent="."]
+layout_mode = 1
+anchors_preset = 0
+anchor_right = 0.38
+anchor_bottom = 1.0
+grow_vertical = 2
+clip_contents = true
+theme_override_styles/panel = SubResource("StyleBoxFlat_left_panel")
+
+[node name="ContentMargin" type="MarginContainer" parent="LeftPanel"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+theme_override_constants/margin_left = 56
+theme_override_constants/margin_top = 48
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 40
 
-[node name="VBoxContainer" type="VBoxContainer" parent="CenterContainer"]
+[node name="ContentContainer" type="VBoxContainer" parent="LeftPanel/ContentMargin"]
 layout_mode = 2
+size_flags_vertical = 4
 theme_override_constants/separation = 0
 
-[node name="SigilSlot" type="CenterContainer" parent="CenterContainer/VBoxContainer"]
-layout_mode = 2
-
-[node name="Sigil" type="Control" parent="CenterContainer/VBoxContainer/SigilSlot"]
-custom_minimum_size = Vector2(64, 64)
-layout_mode = 2
-
-[node name="Outer" type="Panel" parent="CenterContainer/VBoxContainer/SigilSlot/Sigil"]
-layout_mode = 0
-offset_right = 64.0
-offset_bottom = 64.0
-rotation = 0.785398
-pivot_offset = Vector2(32, 32)
-theme_override_styles/panel = SubResource("StyleBoxFlat_sigil_outer")
-
-[node name="Inner" type="Panel" parent="CenterContainer/VBoxContainer/SigilSlot/Sigil"]
-layout_mode = 0
-offset_left = 14.0
-offset_top = 14.0
-offset_right = 50.0
-offset_bottom = 50.0
-rotation = 0.785398
-pivot_offset = Vector2(18, 18)
-theme_override_styles/panel = SubResource("StyleBoxFlat_sigil_inner")
-
-[node name="Dot" type="Panel" parent="CenterContainer/VBoxContainer/SigilSlot/Sigil"]
-layout_mode = 0
-offset_left = 27.0
-offset_top = 27.0
-offset_right = 37.0
-offset_bottom = 37.0
-theme_override_styles/panel = SubResource("StyleBoxFlat_sigil_dot")
-
-[node name="SigilSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 26)
-layout_mode = 2
-
-[node name="TitleLabel" type="Label" parent="CenterContainer/VBoxContainer"]
+[node name="TitleLabel" type="Label" parent="LeftPanel/ContentMargin/ContentContainer"]
 layout_mode = 2
 theme_type_variation = &"TitleLabel"
 theme_override_fonts/font = SubResource("FontVariation_title")
-theme_override_font_sizes/font_size = 72
+theme_override_font_sizes/font_size = 40
 text = "ESSENCE LIMIT"
-horizontal_alignment = 1
+horizontal_alignment = 0
+autowrap_mode = 2
 
-[node name="TitleSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 22)
+[node name="TitleSpacer" type="Control" parent="LeftPanel/ContentMargin/ContentContainer"]
+custom_minimum_size = Vector2(0, 18)
 layout_mode = 2
 
-[node name="SubtitleRow" type="HBoxContainer" parent="CenterContainer/VBoxContainer"]
+[node name="SubtitleRow" type="HBoxContainer" parent="LeftPanel/ContentMargin/ContentContainer"]
 layout_mode = 2
-theme_override_constants/separation = 16
-alignment = 1
+theme_override_constants/separation = 8
+alignment = 0
 
-[node name="LineLeft" type="ColorRect" parent="CenterContainer/VBoxContainer/SubtitleRow"]
-custom_minimum_size = Vector2(64, 1)
+[node name="LineLeft" type="ColorRect" parent="LeftPanel/ContentMargin/ContentContainer/SubtitleRow"]
+custom_minimum_size = Vector2(18, 1)
 layout_mode = 2
 size_flags_vertical = 4
 color = Color(0.588, 0.431, 0.235, 0.6)
 
-[node name="SubtitleLabel" type="Label" parent="CenterContainer/VBoxContainer/SubtitleRow"]
+[node name="SubtitleLabel" type="Label" parent="LeftPanel/ContentMargin/ContentContainer/SubtitleRow"]
 layout_mode = 2
+size_flags_horizontal = 3
 theme_type_variation = &"MutedLabel"
-theme_override_font_sizes/font_size = 19
+theme_override_font_sizes/font_size = 12
+autowrap_mode = 2
 text = "Тёмное подземелье ждёт того, кто осмелится войти"
 
-[node name="LineRight" type="ColorRect" parent="CenterContainer/VBoxContainer/SubtitleRow"]
-custom_minimum_size = Vector2(64, 1)
-layout_mode = 2
-size_flags_vertical = 4
-color = Color(0.588, 0.431, 0.235, 0.6)
-
-[node name="MenuSpacer" type="Control" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(0, 48)
+[node name="MenuSpacer" type="Control" parent="LeftPanel/ContentMargin/ContentContainer"]
+custom_minimum_size = Vector2(0, 40)
 layout_mode = 2
 
-[node name="ButtonsContainer" type="VBoxContainer" parent="CenterContainer/VBoxContainer"]
-custom_minimum_size = Vector2(360, 0)
+[node name="ButtonsContainer" type="VBoxContainer" parent="LeftPanel/ContentMargin/ContentContainer"]
 layout_mode = 2
-size_flags_horizontal = 4
 theme_override_constants/separation = 6
 
-[node name="NewGameButton" type="Button" parent="CenterContainer/VBoxContainer/ButtonsContainer"]
+[node name="NewGameButton" type="Button" parent="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer"]
 layout_mode = 2
 theme_type_variation = &"MenuItemButton"
 text = "Новая игра"
 alignment = 0
 
-[node name="ContinueButton" type="Button" parent="CenterContainer/VBoxContainer/ButtonsContainer"]
+[node name="ContinueButton" type="Button" parent="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer"]
 layout_mode = 2
 theme_type_variation = &"MenuItemButton"
 text = "Продолжить"
 alignment = 0
 
-[node name="SettingsButton" type="Button" parent="CenterContainer/VBoxContainer/ButtonsContainer"]
+[node name="SettingsButton" type="Button" parent="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer"]
 layout_mode = 2
 theme_type_variation = &"MenuItemButton"
 text = "Настройки"
 alignment = 0
 
-[node name="ExitButton" type="Button" parent="CenterContainer/VBoxContainer/ButtonsContainer"]
+[node name="ExitButton" type="Button" parent="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer"]
 layout_mode = 2
 theme_type_variation = &"MenuItemButton"
 text = "Выход"
 alignment = 0
 
-[node name="Footer" type="HBoxContainer" parent="."]
+[node name="Footer" type="VBoxContainer" parent="LeftPanel"]
 layout_mode = 1
 anchors_preset = 12
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = 30.0
-offset_top = -52.0
-offset_right = -30.0
-offset_bottom = -22.0
+offset_left = 56.0
+offset_top = -56.0
+offset_right = -40.0
+offset_bottom = -24.0
 grow_horizontal = 2
 grow_vertical = 0
+theme_override_constants/separation = 4
 
-[node name="HintLabel" type="Label" parent="Footer"]
+[node name="HintLabel" type="Label" parent="LeftPanel/Footer"]
 layout_mode = 2
-size_flags_horizontal = 3
 theme_type_variation = &"DimLabel"
+autowrap_mode = 2
 text = "↑↓ выбор   ·   Enter подтвердить   ·   Esc назад"
 
-[node name="VersionLabel" type="Label" parent="Footer"]
+[node name="VersionLabel" type="Label" parent="LeftPanel/Footer"]
 layout_mode = 2
 theme_type_variation = &"DimLabel"
 text = "v0.1.0 — alpha"
-horizontal_alignment = 2
 
 [node name="SettingsOverlay" type="Control" parent="."]
 visible = false
@@ -409,10 +361,10 @@ text = "Управление"
 layout_mode = 2
 text = "Назад"
 
-[connection signal="pressed" from="CenterContainer/VBoxContainer/ButtonsContainer/NewGameButton" to="." method="_on_new_game_pressed"]
-[connection signal="pressed" from="CenterContainer/VBoxContainer/ButtonsContainer/ContinueButton" to="." method="_on_continue_pressed"]
-[connection signal="pressed" from="CenterContainer/VBoxContainer/ButtonsContainer/SettingsButton" to="." method="_on_settings_pressed"]
-[connection signal="pressed" from="CenterContainer/VBoxContainer/ButtonsContainer/ExitButton" to="." method="_on_exit_pressed"]
+[connection signal="pressed" from="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/NewGameButton" to="." method="_on_new_game_pressed"]
+[connection signal="pressed" from="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/ContinueButton" to="." method="_on_continue_pressed"]
+[connection signal="pressed" from="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/SettingsButton" to="." method="_on_settings_pressed"]
+[connection signal="pressed" from="LeftPanel/ContentMargin/ContentContainer/ButtonsContainer/ExitButton" to="." method="_on_exit_pressed"]
 [connection signal="pressed" from="SettingsOverlay/Panel/Margin/VBoxContainer/ControlsButton" to="." method="_on_controls_pressed"]
 [connection signal="pressed" from="SettingsOverlay/Panel/Margin/VBoxContainer/BackButton" to="." method="_on_settings_back_pressed"]
 [connection signal="value_changed" from="SettingsOverlay/Panel/Margin/VBoxContainer/VolumeSlider" to="." method="_on_volume_changed"]

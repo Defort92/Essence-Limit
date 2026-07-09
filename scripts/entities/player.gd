@@ -96,11 +96,12 @@ var _is_fleeing: bool = false
 ## Сколько секунд беглец остаётся в сцене, прежде чем исчезнуть.
 const FLEE_DESPAWN_TIME: float = 6.0
 
-## Своя экипировка/эссенции/способности — не общие на отряд, см. player.tscn.
+## Своя экипировка/эссенции/способности/рюкзак — не общие на отряд, см. player.tscn.
 @onready var equipment: EquipmentManager = $Equipment
 @onready var essence: EssenceSystem = $Essence
 @onready var ability_manager: AbilityManager = $Abilities
 @onready var statuses: StatusComponent = $Statuses
+@onready var inventory: InventoryComponent = $Inventory
 
 var _dodge_timer: float = 0.0
 var _dodge_direction: Vector3 = Vector3.ZERO
@@ -231,8 +232,9 @@ func take_damage(amount: int, is_crit: bool = false) -> void:
 		died.emit()
 
 ## Спавнит рядом с телом контейнер лута, если на павшем есть снаряжение. Контейнер ссылается
-## на эту же equipment-компоненту — «взять» снимает предмет прямо с трупа в общий рюкзак.
-## Незалутанное снаряжение остаётся на союзнике и переживёт возрождение при смене сцены.
+## на эту же equipment-компоненту — «взять» снимает предмет прямо с трупа в рюкзак активного
+## (управляемого игроком) мародёра. Незалутанное снаряжение остаётся на союзнике и переживёт
+## возрождение при смене сцены.
 func _spawn_loot_corpse() -> void:
 	if not equipment.has_any_equipped():
 		return
@@ -558,7 +560,7 @@ func _use_quick_slot(slot_idx: int) -> void:
 	var item_id: String = quick_slots[slot_idx]
 	if item_id.is_empty():
 		return
-	InventorySystem.use_consumable(item_id, self)
+	inventory.use_consumable(item_id, self)
 
 ## Назначает предмет на быстрый слот. Вызывается из UI инвентаря.
 func set_quick_slot(slot_idx: int, item_id: String) -> void:
@@ -957,6 +959,10 @@ func _init_from_roster() -> void:
 	var equipment_data: Dictionary = entry.get("equipment", {})
 	if not equipment_data.is_empty():
 		equipment.deserialize(equipment_data)
+
+	var inventory_data: Array = entry.get("inventory", [])
+	if not inventory_data.is_empty():
+		inventory.deserialize(inventory_data)
 
 	essence.bonus_slots = int(entry.get("essence_bonus_slots", 0))
 	essence.resize_to_level(XPSystem.current_level)

@@ -25,7 +25,7 @@ const SHAKE_AMPLITUDE: float = 0.09
 const BASE_FONT_SIZE: int = 32
 const CRIT_FONT_SIZE: int = 46
 ## Шрифт интерфейса — чтобы цифры совпадали по стилю с остальным UI (не дефолтный шрифт).
-const UI_FONT_PATH: String = "res://assets/fonts/Forum-Regular.ttf"
+const UI_FONT_PATH: String = "res://assets/fonts/DotGothic16-Regular.ttf"
 
 var _elapsed: float = 0.0
 var _anchor: Vector3 = Vector3.ZERO
