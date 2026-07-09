@@ -1,17 +1,20 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=13 format=3]
 
 [ext_resource type="Script" path="res://scripts/entities/enemy.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/components/directional_sprite.gd" id="2"]
+[ext_resource type="Script" path="res://scripts/components/enemy_ability_controller.gd" id="11"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front.png" id="3"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front-right.png" id="4"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/full_right.png" id="5"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/rear-right.png" id="6"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/back.png" id="7"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/rear_left.png" id="8"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/full_left.png" id="9"]
+[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front-left.png" id="10"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
 height = 1.8
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_1"]
-radius = 0.4
-height = 1.8
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
-albedo_color = Color(0.8, 0.2, 0.2, 1)
 
 [node name="Enemy" type="CharacterBody3D"]
 script = ExtResource("1")
@@ -20,7 +23,26 @@ script = ExtResource("1")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="."]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
-mesh = SubResource("CapsuleMesh_1")
-surface_material_override/0 = SubResource("StandardMaterial3D_1")
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.5
+target_desired_distance = 0.5
+
+[node name="Sprite3D" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, 0)
+pixel_size = 0.015
+billboard = 2
+texture_filter = 0
+alpha_cut = 1
+texture = ExtResource("3")
+script = ExtResource("2")
+tex_front = ExtResource("3")
+tex_front_right = ExtResource("4")
+tex_right = ExtResource("5")
+tex_rear_right = ExtResource("6")
+tex_back = ExtResource("7")
+tex_rear_left = ExtResource("8")
+tex_left = ExtResource("9")
+tex_front_left = ExtResource("10")
+
+[node name="AbilityController" type="Node" parent="."]
+script = ExtResource("11")

@@ -1,0 +1,14 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/item_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "gold"
+display_name = "Золото"
+description = "Валюта. Хранится в рюкзаке персонажа, как обычный предмет."
+rarity = 0
+buy_price = 0
+sell_price = 0
+is_stackable = true
+max_stack = 999999999

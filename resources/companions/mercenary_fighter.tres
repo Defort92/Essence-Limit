@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="CompanionData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/companion_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+display_name = "Азгор"
+race = 3
+combat_role = 0
+hire_cost = 70
+initial_trust = 50

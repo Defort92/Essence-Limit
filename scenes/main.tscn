@@ -5,6 +5,18 @@
 [ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="3"]
 [ext_resource type="PackedScene" path="res://scenes/characters/enemy_base.tscn" id="4"]
 [ext_resource type="Resource" uid="uid://buqrmtu56x0k7" path="res://resources/enemies/goblin.tres" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/loot_ui.tscn" id="6"]
+[ext_resource type="PackedScene" path="res://scenes/ui/states_screen.tscn" id="7"]
+[ext_resource type="PackedScene" path="res://scenes/ui/character_screen.tscn" id="17"]
+[ext_resource type="PackedScene" path="res://scenes/ui/pause_menu.tscn" id="8"]
+[ext_resource type="Script" path="res://scripts/systems/mob_spawner.gd" id="9"]
+[ext_resource type="Script" path="res://scripts/components/healing_aura.gd" id="10"]
+[ext_resource type="Resource" path="res://resources/statuses/regeneration.tres" id="11"]
+[ext_resource type="Script" path="res://scripts/systems/party_starter.gd" id="12"]
+[ext_resource type="Script" path="res://scripts/data/companion_data.gd" id="13"]
+[ext_resource type="Resource" path="res://resources/companions/mercenary_healer.tres" id="14"]
+[ext_resource type="Resource" path="res://resources/companions/mercenary_fighter.tres" id="15"]
+[ext_resource type="PackedScene" path="res://scenes/world/scene_portal.tscn" id="16"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(60, 1, 60)
@@ -15,7 +27,14 @@ size = Vector3(60, 1, 60)
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
 albedo_color = Color(0.25, 0.22, 0.18, 1)
 
+[sub_resource type="NavigationMesh" id="NavigationMesh_1"]
+vertices = PackedVector3Array(-30, 0, -30, 30, 0, -30, 30, 0, 30, -30, 0, 30)
+polygons = [PackedInt32Array(0, 1, 2, 3)]
+
 [node name="Main" type="Node3D" unique_id=1014595042]
+
+[node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
+navigation_mesh = SubResource("NavigationMesh_1")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1978617156]
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 15, 5)
@@ -39,8 +58,42 @@ surface_material_override/0 = SubResource("StandardMaterial3D_1")
 [node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8525088, 0)
 
+[node name="PartyStarter" type="Node" parent="."]
+script = ExtResource("12")
+companions = Array[ExtResource("13")]([ExtResource("14"), ExtResource("15")])
+
+[node name="PortalToCity" parent="." instance=ExtResource("16")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0, 6)
+target_scene = "res://scenes/world/human_city.tscn"
+destination_name = "Человеческий город"
+
 [node name="HUD" parent="." unique_id=1866468055 instance=ExtResource("3")]
+location_name = "Испытательный полигон"
+
+[node name="LootUI" parent="." instance=ExtResource("6")]
 
 [node name="Goblin" parent="." unique_id=1353285753 instance=ExtResource("4")]
 transform = Transform3D(1, 0, 0, 0, 0.99999905, 0.0013438966, 0, -0.0013438966, 0.99999905, 5, 0, 0)
 data = ExtResource("5")
+
+[node name="CharacterScreen" parent="." instance=ExtResource("17")]
+
+[node name="StatesScreen" parent="." instance=ExtResource("7")]
+
+[node name="PauseMenu" parent="." instance=ExtResource("8")]
+
+[node name="MobSpawner" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 12, 0, -8)
+script = ExtResource("9")
+enemy_scene = ExtResource("4")
+enemy_data = ExtResource("5")
+spawn_interval = 6.0
+max_alive = 4
+spawn_radius = 6.0
+initial_delay = 3.0
+
+[node name="HealingAura" type="Node3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 0, 0)
+script = ExtResource("10")
+radius = 6.0
+status_effect = ExtResource("11")

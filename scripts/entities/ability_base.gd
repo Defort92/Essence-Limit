@@ -1,6 +1,6 @@
 ## Базовый класс для активной способности, получаемой через эссенцию.
-## Добавляется как дочерний узел к Player через AbilityManager при экипировке эссенции.
-## Наследуй этот класс, переопределяй [method activate] для реализации эффекта.
+## Добавляется как дочерний узел к владельцу: к Player — через AbilityManager,
+## к Enemy — через EnemyAbilityController. Наследуй, переопределяй [method activate].
 extends Node
 class_name AbilityBase
 
@@ -8,8 +8,9 @@ class_name AbilityBase
 @export var description: String = ""
 @export var cooldown_duration: float = 5.0
 
-## Ссылка на Player, установленная AbilityManager при спавне.
-var caster: Player = null
+## Владелец способности: Player или Enemy. У обоих есть faction, heal(),
+## apply_timed_modifier() — при таргетинге фильтруй цели через Faction.is_hostile().
+var caster: CharacterBody3D = null
 var current_cooldown: float = 0.0
 
 signal activated(ability: AbilityBase)

@@ -22,9 +22,6 @@ Outputs (in same folder as input, subfolder per action):
 
 Example:
     python build_spritesheet.py human_attack_w_poseboard.png --action attack --dir w
-
-Requirements:
-    pip install Pillow numpy
 """
 
 import sys

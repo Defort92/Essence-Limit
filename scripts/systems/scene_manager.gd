@@ -13,6 +13,10 @@ func go_to(scene_path: String) -> void:
 func go_to_main_menu() -> void:
 	go_to("res://scenes/ui/main_menu.tscn")
 
+## Переход на экран создания персонажа (выбор расы и имени).
+func go_to_character_creation() -> void:
+	go_to("res://scenes/ui/character_creation.tscn")
+
 ## Переход в человеческий город (основной хаб).
 func go_to_city() -> void:
 	go_to("res://scenes/world/human_city.tscn")

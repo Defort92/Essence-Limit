@@ -1,6 +1,7 @@
-[gd_resource type="Resource" format=3 uid="uid://buqrmtu56x0k7"]
+[gd_resource type="Resource" load_steps=3 format=3 uid="uid://buqrmtu56x0k7"]
 
 [ext_resource type="Script" path="res://scripts/data/enemy_data.gd" id="1"]
+[ext_resource type="Resource" path="res://resources/statuses/smoldering.tres" id="2"]
 
 [resource]
 script = ExtResource("1")
@@ -16,3 +17,5 @@ xp_reward = 30
 gold_drop_min = 1
 gold_drop_max = 5
 is_unique = false
+attack_status = ExtResource("2")
+sprite_tint = Color(1, 0.55, 0.55, 1)

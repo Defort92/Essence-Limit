@@ -1,0 +1,176 @@
+[gd_scene load_steps=6 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/states_screen.gd" id="1_script"]
+[ext_resource type="Shader" path="res://assets/shaders/backdrop_blur.gdshader" id="2_blur"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_close_button.gd" id="3_close"]
+[ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="4_sep"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_blur"]
+shader = ExtResource("2_blur")
+shader_parameter/blur_radius = 2.5
+
+[node name="StatesScreen" type="CanvasLayer"]
+script = ExtResource("1_script")
+
+[node name="BlurRect" type="ColorRect" parent="."]
+material = SubResource("ShaderMaterial_blur")
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(1, 1, 1, 1)
+
+[node name="Dim" type="ColorRect" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.016, 0.012, 0.016, 0.58)
+
+[node name="Backdrop" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="CenterContainer" type="CenterContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Panel" type="Panel" parent="CenterContainer"]
+custom_minimum_size = Vector2(920, 560)
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="CenterContainer/Panel"]
+layout_mode = 2
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBox" type="VBoxContainer" parent="CenterContainer/Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderRow" type="HBoxContainer" parent="CenterContainer/Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="TitleBox" type="VBoxContainer" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+theme_override_constants/separation = 2
+
+[node name="TitleLabel" type="Label" parent="CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox"]
+layout_mode = 2
+theme_type_variation = &"TitleLabel"
+theme_override_font_sizes/font_size = 30
+text = "Состояния героя"
+
+[node name="SubtitleLabel" type="Label" parent="CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox"]
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+theme_override_font_sizes/font_size = 16
+text = "всё, что сейчас влияет на тебя"
+
+[node name="Spacer" type="Control" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="BuffsCountLabel" type="Label" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.498, 0.682, 0.384, 1)
+theme_override_font_sizes/font_size = 18
+text = "▲ 0 блага"
+
+[node name="DebuffsCountLabel" type="Label" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_vertical = 4
+theme_override_colors/font_color = Color(0.82, 0.416, 0.29, 1)
+theme_override_font_sizes/font_size = 18
+text = "▼ 0 недуга"
+
+[node name="CloseButton" type="Button" parent="CenterContainer/Panel/Margin/VBox/HeaderRow"]
+layout_mode = 2
+size_flags_vertical = 4
+script = ExtResource("3_close")
+close_action = "states"
+
+[node name="HeaderSeparator" type="ColorRect" parent="CenterContainer/Panel/Margin/VBox"]
+layout_mode = 2
+script = ExtResource("4_sep")
+
+[node name="Columns" type="HBoxContainer" parent="CenterContainer/Panel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 0
+
+[node name="BuffsColumn" type="VBoxContainer" parent="CenterContainer/Panel/Margin/VBox/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="BuffsHeader" type="Label" parent="CenterContainer/Panel/Margin/VBox/Columns/BuffsColumn"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.498, 0.682, 0.384, 1)
+text = "БЛАГА · 0"
+
+[node name="Scroll" type="ScrollContainer" parent="CenterContainer/Panel/Margin/VBox/Columns/BuffsColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="BuffsList" type="VBoxContainer" parent="CenterContainer/Panel/Margin/VBox/Columns/BuffsColumn/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="VSeparator" type="ColorRect" parent="CenterContainer/Panel/Margin/VBox/Columns"]
+custom_minimum_size = Vector2(1, 0)
+layout_mode = 2
+color = Color(0.471, 0.376, 0.212, 0.14)
+
+[node name="DebuffsColumn" type="VBoxContainer" parent="CenterContainer/Panel/Margin/VBox/Columns"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="DebuffsHeader" type="Label" parent="CenterContainer/Panel/Margin/VBox/Columns/DebuffsColumn"]
+layout_mode = 2
+theme_type_variation = &"HeaderLabel"
+theme_override_colors/font_color = Color(0.82, 0.416, 0.29, 1)
+text = "НЕДУГИ · 0"
+
+[node name="Scroll" type="ScrollContainer" parent="CenterContainer/Panel/Margin/VBox/Columns/DebuffsColumn"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="DebuffsList" type="VBoxContainer" parent="CenterContainer/Panel/Margin/VBox/Columns/DebuffsColumn/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 10
+
+[node name="FooterHint" type="Label" parent="CenterContainer/Panel/Margin/VBox"]
+layout_mode = 2
+theme_type_variation = &"DimLabel"
+theme_override_font_sizes/font_size = 14
+text = "Постоянные состояния держатся, пока действует их источник · временные исчезают по таймеру · клик вне окна — вернуться в бой"
+
+[connection signal="gui_input" from="Backdrop" to="." method="_on_backdrop_input"]
+[connection signal="pressed" from="CenterContainer/Panel/Margin/VBox/HeaderRow/CloseButton" to="." method="_on_close_pressed"]

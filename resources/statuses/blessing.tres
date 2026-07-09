@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="StatusEffectData" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/data/status_effect_data.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/data/stat_modifier.gd" id="2"]
+
+[sub_resource type="Resource" id="mod_regen"]
+script = ExtResource("2")
+stat = "regen"
+op = 0
+value = 2.0
+source_id = ""
+
+[resource]
+script = ExtResource("1")
+id = "blessing"
+display_name = "Благословение пути"
+description = "Свет города ещё хранит тебя. Раны затягиваются быстрее."
+glyph = "✧"
+color = Color(0.498, 0.682, 0.384, 1)
+is_debuff = false
+duration = 0.0
+modifiers = [SubResource("mod_regen")]

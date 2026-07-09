@@ -6,11 +6,16 @@ extends Node
 
 var is_paused: bool = false
 
+func _enter_tree() -> void:
+	# ALWAYS гарантирует, что _unhandled_input работает даже когда дерево поставлено на паузу.
+	# Без этого нажатие "pause" для снятия паузы не сработает.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 signal paused()
 signal unpaused()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if event.is_action_just_pressed("pause"):
+	if event.is_action_pressed("pause"):
 		toggle_pause()
 
 ## Переключает паузу: если активна — снимает, иначе — включает.

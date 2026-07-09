@@ -1,0 +1,17 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/consumable_data.gd" id="1"]
+
+[resource]
+script = ExtResource("1")
+id = "health_potion"
+display_name = "Зелье лечения"
+description = "Восстанавливает 30 HP."
+rarity = 0
+buy_price = 15
+sell_price = 5
+is_stackable = true
+max_stack = 99
+effect_type = 0
+effect_value = 30.0
+duration = 0.0

@@ -1,7 +1,10 @@
-## Рюкзак игрока (до MAX_SLOTS ячеек).
+## Личный рюкзак одного персонажа (до MAX_SLOTS ячеек).
 ## Каждая ячейка — словарь { item: ItemData, quantity: int }.
-## Является Autoload-синглтоном; регистрировать как "InventorySystem" в Project Settings.
+## Компонент на каждого участника отряда — дочерний узел "Inventory" в player.tscn.
+## У каждого персонажа свой рюкзак, доступ через Player.inventory (см. PartySystem.get_active_inventory()
+## для "рюкзака активного персонажа", куда по умолчанию попадают лут/находки/покупки).
 extends Node
+class_name InventoryComponent
 
 const MAX_SLOTS: int = 30
 
@@ -15,6 +18,8 @@ signal inventory_changed()
 ## Стакабельные предметы сначала докладываются в существующие стаки.
 ## Возвращает [code]false[/code] если рюкзак полон и ни одна единица не добавлена.
 func add_item(item: ItemData, quantity: int = 1) -> bool:
+	var any_added := false
+
 	if item.is_stackable:
 		for slot in _slots:
 			if slot.item.id == item.id and slot.quantity < item.max_stack:
@@ -22,6 +27,7 @@ func add_item(item: ItemData, quantity: int = 1) -> bool:
 				var to_add: int = min(space, quantity)
 				slot.quantity += to_add
 				quantity -= to_add
+				any_added = true
 				item_added.emit(item, to_add)
 				if quantity == 0:
 					inventory_changed.emit()
@@ -29,10 +35,14 @@ func add_item(item: ItemData, quantity: int = 1) -> bool:
 
 	while quantity > 0:
 		if _slots.size() >= MAX_SLOTS:
+			# Частичное добавление состоялось — UI должен обновиться.
+			if any_added:
+				inventory_changed.emit()
 			return false
 		var to_add: int = min(quantity, item.max_stack) if item.is_stackable else 1
 		_slots.append({ "item": item, "quantity": to_add })
 		item_added.emit(item, to_add)
+		any_added = true
 		quantity -= to_add
 
 	inventory_changed.emit()

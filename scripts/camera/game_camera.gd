@@ -11,11 +11,16 @@ var _target: Node3D
 
 func _ready() -> void:
 	rotation_degrees = Vector3(PITCH_DEG, 0.0, 0.0)
+	PartySystem.active_member_changed.connect(_on_active_member_changed)
 	await get_tree().process_frame
-	_target = get_tree().get_first_node_in_group("player")
+	_target = PartySystem.get_active_member()
 
 func _process(delta: float) -> void:
 	if _target == null:
 		return
 	var desired := _target.global_position + offset
 	global_position = global_position.lerp(desired, FOLLOW_SPEED * delta)
+
+## Плавно перенацеливается на нового активного участника при переключении управления.
+func _on_active_member_changed(_old_member: Player, new_member: Player) -> void:
+	_target = new_member
