@@ -1,40 +1,43 @@
-[gd_scene load_steps=16 format=3 uid="uid://o0kyfh8ytad1"]
+[gd_scene format=3 uid="uid://o0kyfh8ytad1"]
 
 [ext_resource type="Script" uid="uid://c8m52272kpxn0" path="res://scripts/entities/player.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/components/directional_sprite.gd" id="2"]
-[ext_resource type="Script" path="res://scripts/systems/equipment_manager.gd" id="11"]
-[ext_resource type="Script" path="res://scripts/systems/essence_system.gd" id="12"]
-[ext_resource type="Script" path="res://scripts/systems/ability_manager.gd" id="13"]
-[ext_resource type="Script" path="res://scripts/components/status_component.gd" id="14"]
-[ext_resource type="Script" path="res://scripts/systems/inventory_system.gd" id="15"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front.png" id="3"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front-right.png" id="4"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/full_right.png" id="5"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/rear-right.png" id="6"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/back.png" id="7"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/rear_left.png" id="8"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/full_left.png" id="9"]
-[ext_resource type="Texture2D" path="res://assets/sprites/characters/base/front-left.png" id="10"]
+[ext_resource type="Script" uid="uid://dha1vebhsho8t" path="res://scripts/components/directional_sprite.gd" id="2"]
+[ext_resource type="Texture2D" uid="uid://dva31bmo3y6ap" path="res://assets/sprites/characters/base/front.png" id="3"]
+[ext_resource type="Texture2D" uid="uid://cmw7att8r40or" path="res://assets/sprites/characters/base/front-right.png" id="4"]
+[ext_resource type="Texture2D" uid="uid://dhrg5kun0mj8g" path="res://assets/sprites/characters/base/full_right.png" id="5"]
+[ext_resource type="Texture2D" uid="uid://bs0i58o7xb03d" path="res://assets/sprites/characters/base/rear-right.png" id="6"]
+[ext_resource type="Texture2D" uid="uid://cipryln25pbni" path="res://assets/sprites/characters/base/back.png" id="7"]
+[ext_resource type="Texture2D" uid="uid://chefmi77kum34" path="res://assets/sprites/characters/base/rear_left.png" id="8"]
+[ext_resource type="Texture2D" uid="uid://by3y883jgrwym" path="res://assets/sprites/characters/base/full_left.png" id="9"]
+[ext_resource type="Texture2D" uid="uid://cp6gekbd5twun" path="res://assets/sprites/characters/base/front-left.png" id="10"]
+[ext_resource type="Script" uid="uid://cmn46tneptgwa" path="res://scripts/systems/equipment_manager.gd" id="11"]
+[ext_resource type="Script" uid="uid://blmd0ov2rj1sr" path="res://scripts/systems/essence_system.gd" id="12"]
+[ext_resource type="Script" uid="uid://bpugfjvybqdwt" path="res://scripts/systems/ability_manager.gd" id="13"]
+[ext_resource type="Script" uid="uid://b4xvg51jq0vgg" path="res://scripts/components/status_component.gd" id="14"]
+[ext_resource type="Script" uid="uid://pawxjeuuw2x4" path="res://scripts/systems/inventory_system.gd" id="15"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
 height = 1.6
 
-[node name="Player" type="CharacterBody3D"]
+[node name="Player" type="CharacterBody3D" unique_id=438317659]
+collision_layer = 2
+collision_mask = 1
 script = ExtResource("1")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=551735869]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
-[node name="Sprite3D" type="Sprite3D" parent="."]
+[node name="Sprite3D" type="Sprite3D" parent="." unique_id=2000712340]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, 0)
 pixel_size = 0.015
 billboard = 2
-texture_filter = 0
 alpha_cut = 1
+texture_filter = 0
 texture = ExtResource("3")
 script = ExtResource("2")
+frames_dir = "res://assets/sprites/characters/base/frames"
 tex_front = ExtResource("3")
 tex_front_right = ExtResource("4")
 tex_right = ExtResource("5")
@@ -44,17 +47,17 @@ tex_rear_left = ExtResource("8")
 tex_left = ExtResource("9")
 tex_front_left = ExtResource("10")
 
-[node name="Equipment" type="Node" parent="."]
+[node name="Equipment" type="Node" parent="." unique_id=1984769723]
 script = ExtResource("11")
 
-[node name="Essence" type="Node" parent="."]
+[node name="Essence" type="Node" parent="." unique_id=2100626133]
 script = ExtResource("12")
 
-[node name="Abilities" type="Node" parent="."]
+[node name="Abilities" type="Node" parent="." unique_id=1787931588]
 script = ExtResource("13")
 
-[node name="Statuses" type="Node" parent="."]
+[node name="Statuses" type="Node" parent="." unique_id=2141571722]
 script = ExtResource("14")
 
-[node name="Inventory" type="Node" parent="."]
+[node name="Inventory" type="Node" parent="." unique_id=1735822246]
 script = ExtResource("15")

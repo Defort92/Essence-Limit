@@ -18,7 +18,7 @@ const COMMON_ACTIONS: Array = [
 	"dodge", "interact",
 	"ability_1", "ability_2", "ability_3", "ability_4",
 	"consumable_1", "consumable_2", "consumable_3", "consumable_4",
-	"inventory", "states",
+	"inventory", "states", "party_command",
 ]
 
 const ACTION_LABELS := {
@@ -38,6 +38,7 @@ const ACTION_LABELS := {
 	"consumable_4": "Расходник 4",
 	"inventory": "Инвентарь",
 	"states": "Состояния",
+	"party_command": "Команда отряду (формация)",
 }
 
 ## Действия, сознательно НЕ показываемые здесь — привязаны к мыши (attack/block) или это

@@ -8,6 +8,8 @@ extends Control
 @onready var _volume_slider: HSlider = $SettingsOverlay/Panel/Margin/VBoxContainer/VolumeSlider
 @onready var _volume_value_label: Label = $SettingsOverlay/Panel/Margin/VBoxContainer/VolumeRow/VolumeValueLabel
 @onready var _fullscreen_check: CheckButton = $SettingsOverlay/Panel/Margin/VBoxContainer/FullscreenRow/FullscreenCheck
+@onready var _font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/FontRow/FontOption
+@onready var _body_font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/BodyFontRow/BodyFontOption
 
 const CONTROLS_SETTINGS_SCENE := preload("res://scenes/ui/controls_settings.tscn")
 
@@ -30,7 +32,19 @@ func _ready() -> void:
 	_volume_slider.value = db_to_linear(AudioServer.get_bus_volume_db(master_bus))
 	_update_volume_label(_volume_slider.value)
 	_fullscreen_check.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	_setup_font_option()
 	_new_game_button.grab_focus()
+
+## Заполняет выпадающие списки шрифтов (заголовок и основной текст) и выделяет текущий выбор.
+func _setup_font_option() -> void:
+	var names := FontSettings.font_names()
+	_font_option.clear()
+	_body_font_option.clear()
+	for font_name in names:
+		_font_option.add_item(font_name)
+		_body_font_option.add_item(font_name)
+	_font_option.select(FontSettings.title_index)
+	_body_font_option.select(FontSettings.body_index)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel") and _settings_overlay.visible:
@@ -65,6 +79,12 @@ func _on_volume_changed(value: float) -> void:
 
 func _update_volume_label(value: float) -> void:
 	_volume_value_label.text = "%d%%" % roundi(value * 100.0)
+
+func _on_font_selected(index: int) -> void:
+	FontSettings.select_title_font(index)
+
+func _on_body_font_selected(index: int) -> void:
+	FontSettings.select_body_font(index)
 
 func _on_fullscreen_toggled(pressed: bool) -> void:
 	var mode: DisplayServer.WindowMode = DisplayServer.WINDOW_MODE_FULLSCREEN if pressed else DisplayServer.WINDOW_MODE_WINDOWED

@@ -30,11 +30,20 @@ var roster: Array[Dictionary] = []
 var members: Array[Player] = []
 var active_index: int = -1
 
+## Режим позиционирования отряда — циклическая команда одной кнопкой (см.
+## Player._handle_party_command_input). FREE — свободное следование за лидером с личной
+## формацией; GATHER («Ко мне») — тугой строй вплотную к лидеру; HOLD («Стоять здесь») —
+## союзники не следуют за лидером, держат текущую позицию (бой в радиусе не отключается).
+enum FormationMode { FREE, GATHER, HOLD }
+var formation_mode: FormationMode = FormationMode.FREE
+
 signal active_member_changed(old_member: Player, new_member: Player)
 signal party_wiped()
 signal member_recruited(roster_index: int)
 ## [param betrayed] true — участник стал врагом; false — сбежал с поля боя.
 signal member_left(member: Player, betrayed: bool)
+## Сменился режим формации отряда (для HUD-индикатора и т.п.).
+signal formation_mode_changed(mode: FormationMode)
 
 # ─── Регистрация и спавн ────────────────────────────────────────────────────
 
@@ -133,6 +142,23 @@ func get_active_member() -> Player:
 func get_active_inventory() -> InventoryComponent:
 	var member := get_active_member()
 	return member.inventory if member != null else null
+
+# ─── Формация (команда отряду) ──────────────────────────────────────────────
+
+## Переключает режим формации по кругу FREE → GATHER → HOLD → FREE. Вызывается активным
+## (управляемым игроком) участником по нажатию кнопки команды отряду.
+func cycle_formation_mode() -> void:
+	formation_mode = ((formation_mode + 1) % FormationMode.size()) as FormationMode
+	formation_mode_changed.emit(formation_mode)
+
+## Человекочитаемое имя режима формации (для HUD).
+static func formation_mode_name(mode: FormationMode) -> String:
+	match mode:
+		FormationMode.GATHER: return "Ко мне"
+		FormationMode.HOLD: return "Стоять"
+		_: return "Свободно"
+
+# ─── Активный участник ──────────────────────────────────────────────────────
 
 ## Передаёт управление участнику с индексом [param index] в members. Не действует,
 ## если он мёртв или уже активен.
@@ -269,6 +295,7 @@ func deserialize(data: Dictionary) -> void:
 func reset() -> void:
 	roster.clear()
 	active_index = -1
+	formation_mode = FormationMode.FREE
 
 func _make_roster_entry(race: int, member_name: String, trust: int, role: int = CompanionData.Role.FIGHTER) -> Dictionary:
 	return {

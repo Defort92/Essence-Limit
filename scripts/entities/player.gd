@@ -15,6 +15,9 @@ const DODGE_SPEED: float = 12.0
 const DODGE_DURATION: float = 0.25
 ## Дистанция до целевой точки (режим бега мышью), на которой персонаж считается пришедшим.
 const MOVE_STOP_DISTANCE: float = 0.2
+## Квадрат горизонтальной скорости, выше которого спрайт проигрывает анимацию ходьбы,
+## а не покоя (см. DirectionalSprite3D.set_moving). 0.25 = ~0.5 м/с.
+const MOVE_ANIM_THRESHOLD_SQ: float = 0.25
 
 # --- Константы боя ---
 ## Длительность состояния ATTACK (окно блокировки повторного удара).
@@ -34,13 +37,42 @@ const REGEN_TICK_INTERVAL: float = 1.0
 ## Дистанция, дальше которой ИИ-союзник подтягивается к лидеру отряда.
 ## База для личной дистанции участника (_ai_follow_distance, см. _seed_ai_personality).
 const AI_FOLLOW_DISTANCE: float = 2.5
-## Дистанция, дальше которой подтягивание ускоряется (отстал слишком сильно).
+## Дистанция, за которой союзник, догнав лидера, какое-то время идёт рядом (плечом к
+## плечу), а не сваливается назад в формацию.
 const AI_FOLLOW_CATCHUP_DISTANCE: float = 6.0
+## Гистерезис следования: союзник трогается с места, только выйдя за _ai_follow_distance,
+## и останавливается, лишь подойдя внутрь _ai_follow_distance * этого множителя. Разные
+## пороги «идти»/«стоять» убирают дёрганье у самой границы дистанции, когда лидер стоит.
+const AI_FOLLOW_STOP_FACTOR: float = 0.5
+## Прирост множителя скорости за каждый метр отставания сверх стоп-дистанции. Чем дальше
+## союзник отстал — тем быстрее бежит, плавно, без скачка на пороге.
+const AI_CATCHUP_GAIN: float = 0.4
+## Потолок множителя скорости догона: союзник может бежать до 1.9× быстрее лидера, чтобы
+## реально сократить разрыв и подтянуться, а не тащиться позади на его же скорости.
+const AI_MAX_CATCHUP_SCALE: float = 1.9
+## Дистанция, дальше которой союзник считается потерявшимся (застрял на геометрии, отстал
+## за закрытой дверью) и телепортируется к лидеру, а не бежит через полкарты.
+const AI_TELEPORT_DISTANCE: float = 22.0
 ## Сколько секунд союзник, догнавший сильное отставание, идёт рядом с лидером
 ## (плечом к плечу), прежде чем вернуться на своё место в формации.
 const AI_BESIDE_DURATION: float = 3.5
 ## Радиус, в котором ИИ-союзник сам находит и атакует ближайшего врага.
 const AI_ENGAGE_RANGE: float = 8.0
+## Ускорение разгона/торможения ИИ-движения (ед/сек²). Скорость плавно тянется к целевой,
+## а не ставится мгновенно — старт и остановка получают вес, союзник не «телепортит»
+## velocity и не скользит рывками. MOVE_SPEED (5.0) набирается за ~0.13 с.
+const AI_ACCEL: float = 40.0
+## Радиус, в котором союзник расталкивается с другими союзниками (separation): держит строй
+## разреженным, чтобы компаньоны не слипались в одну точку и не толкались физикой.
+const AI_SEPARATION_RADIUS: float = 1.3
+## Сила расталкивания — на сколько метров сдвигается целевая точка на самой ближней
+## дистанции (вплотную). Спадает линейно до нуля на границе радиуса.
+const AI_SEPARATION_STRENGTH: float = 1.1
+## Множитель личной дистанции следования в режиме «Ко мне» (GATHER): союзники подходят
+## к лидеру заметно ближе, чем в свободном строю.
+const AI_GATHER_DISTANCE_SCALE: float = 0.45
+## Множитель смещения формации в режиме «Ко мне»: весь строй сжимается к лидеру.
+const AI_GATHER_OFFSET_SCALE: float = 0.5
 
 # --- Уступание дороги вне боя ---
 ## Вне боя (исследование территории) союзник, стоящий на пути идущего прямо на него
@@ -169,6 +201,7 @@ func _physics_process(delta: float) -> void:
 		_attack_timer -= delta
 	if _post_switch_invuln_timer > 0.0:
 		_post_switch_invuln_timer = max(0.0, _post_switch_invuln_timer - delta)
+	_ai_delta = delta
 	_tick_passive_regen(delta)
 
 	match state:
@@ -179,12 +212,17 @@ func _physics_process(delta: float) -> void:
 				_handle_block_input()
 				_handle_dodge_input()
 				_handle_consumable_input()
+				_handle_party_command_input()
 			else:
 				_ai_process(delta)
 		State.ATTACK:
 			if control_mode == ControlMode.HUMAN:
 				_handle_movement(delta)
 				_handle_block_input()
+			else:
+				# ИИ во время замаха стоит на месте, плавно гася инерцию, — иначе союзник
+				# доезжает по инерции («скользит») весь ATTACK_STATE_DURATION.
+				_ai_hold_position()
 			_tick_attack_state(delta)
 		State.DODGE:
 			_tick_dodge(delta)
@@ -194,9 +232,12 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity.y += GRAVITY * delta
 
-	# Разворачиваем спрайт по последнему направлению взгляда (движение/атака/уклонение).
+	# Разворачиваем спрайт по последнему направлению взгляда (движение/атака/уклонение)
+	# и переключаем анимацию ходьба/покой по фактической горизонтальной скорости.
 	if _sprite != null and state != State.DEAD:
 		_sprite.face_direction(_last_move_dir)
+		var horiz_speed_sq: float = velocity.x * velocity.x + velocity.z * velocity.z
+		_sprite.set_moving(horiz_speed_sq > MOVE_ANIM_THRESHOLD_SQ)
 
 	move_and_slide()
 
@@ -227,6 +268,7 @@ func take_damage(amount: int, is_crit: bool = false) -> void:
 		remove_from_group("combatants")
 		# Затемняем спрайт — тело союзника остаётся в сцене как визуальный труп/маркер лута.
 		if _sprite != null:
+			_sprite.set_moving(false)  # труп замирает в покое, а не «шагает» на месте
 			_sprite.darken_base(0.5, 0.9)
 		_spawn_loot_corpse()
 		died.emit()
@@ -570,6 +612,13 @@ func set_quick_slot(slot_idx: int, item_id: String) -> void:
 
 # ─── Управление отрядом (PartySystem) ──────────────────────────────────────
 
+## Циклическая команда отряду по кнопке "party_command": переключает режим формации
+## FREE → GATHER («Ко мне») → HOLD («Стоять») → FREE. Обрабатывается только активным
+## (управляемым игроком) участником, поэтому вызывается из HUMAN-ветки _physics_process.
+func _handle_party_command_input() -> void:
+	if Input.is_action_just_pressed("party_command"):
+		PartySystem.cycle_formation_mode()
+
 ## Переключает режим управления. Вызывается только из PartySystem.
 ## HUMAN добавляет узел в группу "player" (её ищут камера, HUD, AbilityManager),
 ## AI убирает из неё — при этом персонаж не замирает, а продолжает действовать сам.
@@ -661,10 +710,17 @@ var _ai_beside_side: float = 1.0
 var _ai_beside_timer: float = 0.0
 ## > 0 — союзник сейчас уступает дорогу лидеру (шагает в сторону), см. _ai_try_yield.
 var _ai_yield_timer: float = 0.0
+## Гистерезис следования (см. AI_FOLLOW_STOP_FACTOR): true — союзник сейчас догоняет точку
+## формации, false — стоит на месте. Переключается на разных порогах входа/выхода, чтобы
+## не дёргаться туда-сюда у границы дистанции.
+var _ai_is_following: bool = false
 ## Направление бокового шага при уступании дороги (мировые координаты, нормализовано).
 var _ai_yield_dir: Vector3 = Vector3.ZERO
 ## Накопленное время ИИ — фаза для осцилляций дрейфа.
 var _ai_time: float = 0.0
+## Delta текущего физического кадра, проброшенная в ИИ-движение для плавного разгона/
+## торможения (см. _ai_accelerate_to). Ставится в начале _physics_process.
+var _ai_delta: float = 0.0
 
 ## Решает, атаковать ближайшую враждебную цель, следовать за лидером или убегать.
 ## Сама цель переоценивается раз в AI_RETARGET_INTERVAL, но сближение/атака идут каждый кадр.
@@ -689,10 +745,19 @@ func _ai_process(delta: float) -> void:
 	if _ai_cached_target != null and is_instance_valid(_ai_cached_target):
 		_ai_engage(_ai_cached_target)
 	elif PartySystem.members.has(self):
-		_ai_follow_leader()
+		_ai_follow_or_hold()
 	else:
 		# Предатель без цели в радиусе — стоит на месте, за отрядом не ходит.
 		_ai_hold_position()
+
+## Вне боя: следовать за лидером либо стоять на месте — по режиму формации отряда.
+## В режиме HOLD («Стоять здесь») союзник держит текущую позицию и за лидером не идёт;
+## авто-бой в радиусе при этом сохраняется (см. _ai_process — engage идёт до этой ветки).
+func _ai_follow_or_hold() -> void:
+	if PartySystem.formation_mode == PartySystem.FormationMode.HOLD:
+		_ai_hold_position()
+	else:
+		_ai_follow_leader()
 
 ## Возвращает ближайшую живую враждебную по фракции цель в радиусе AI_ENGAGE_RANGE.
 ## Фракционный поиск (не группа "enemies"): у лояльного союзника цели — монстры,
@@ -725,7 +790,8 @@ func _ai_engage(enemy: Node3D) -> void:
 	var is_ranged := _ai_is_ranged_role()
 	var desired_range: float = atk_range * 0.85 if is_ranged else max(0.5, atk_range * 0.6)
 	if dist > desired_range:
-		_ai_move_toward(enemy.global_position)
+		# Расталкивание с соседями — чтобы бойцы окружали врага, а не толпились в одну точку.
+		_ai_move_toward(enemy.global_position + _ai_separation())
 	elif is_ranged and dist < desired_range * 0.5:
 		_ai_move_away_from(enemy.global_position)
 	else:
@@ -752,7 +818,7 @@ func _ai_healer_process(delta: float) -> void:
 		_ai_heal_timer -= delta
 	var patient := _ai_find_heal_target()
 	if patient == null:
-		_ai_follow_leader()
+		_ai_follow_or_hold()
 		return
 	var dist: float = global_position.distance_to(patient.global_position)
 	if dist > AI_HEAL_RANGE:
@@ -800,21 +866,55 @@ func _ai_follow_leader() -> void:
 	if leader == null or leader == self:
 		_ai_hold_position()
 		return
+	# Потерялся: лидер оторвался слишком далеко (застрял на геометрии, отстал за дверью
+	# при смене зоны) — телепортируемся к нему, а не бежим напрямик через полкарты.
+	var gap: Vector3 = leader.global_position - global_position
+	gap.y = 0.0
+	if gap.length() > AI_TELEPORT_DISTANCE:
+		_ai_warp_near(leader)
+		return
 	# Вне боя уступаем дорогу: если лидер вплотную идёт прямо на нас, шагаем в сторону,
 	# чтобы игрок не утыкался в товарища при исследовании территории.
 	if _ai_try_yield(leader):
 		return
-	var desired_pos: Vector3 = leader.global_position + _ai_follow_offset(leader)
+	# Точка следования + расталкивание с соседями по отряду (separation): союзники сами
+	# расходятся, а не слипаются в одну точку и толкаются физикой.
+	var desired_pos: Vector3 = leader.global_position + _ai_follow_offset(leader) + _ai_separation()
 	var dist: float = global_position.distance_to(desired_pos)
-	if dist <= _ai_follow_distance:
+	# В режиме «Ко мне» (GATHER) жмёмся к лидеру — уменьшаем личную дистанцию следования.
+	var follow_dist: float = _ai_follow_distance
+	if PartySystem.formation_mode == PartySystem.FormationMode.GATHER:
+		follow_dist *= AI_GATHER_DISTANCE_SCALE
+	# Гистерезис: трогаемся, только выйдя за follow_dist; останавливаемся, лишь войдя внутрь
+	# стоп-дистанции. Пока лидер стоит и точка формации не плавает (sway заморожен), союзник
+	# спокойно стоит на месте вместо подползания у порога.
+	var stop_dist: float = follow_dist * AI_FOLLOW_STOP_FACTOR
+	if _ai_is_following:
+		if dist <= stop_dist:
+			_ai_is_following = false
+	elif dist > follow_dist:
+		_ai_is_following = true
+	if not _ai_is_following:
 		_ai_hold_position()
 		return
-	var speed_scale: float = _ai_speed_jitter
+	# Чем дальше отстал — тем быстрее догоняет (плавный разгон, а не скачок на пороге).
+	# Потолок AI_MAX_CATCHUP_SCALE позволяет обогнать лидера и подтянуться рядом, а не
+	# тащиться позади на его же скорости.
+	var over: float = dist - stop_dist
+	var speed_scale: float = clampf(1.0 + over * AI_CATCHUP_GAIN, 1.0, AI_MAX_CATCHUP_SCALE) * _ai_speed_jitter
 	if dist > AI_FOLLOW_CATCHUP_DISTANCE:
-		# Сильно отстал — бежит догонять, а догнав, какое-то время идёт рядом с лидером.
-		speed_scale = 1.6 * _ai_speed_jitter
+		# Догнав сильное отставание, какое-то время идёт рядом с лидером, а не сваливается назад.
 		_ai_beside_timer = AI_BESIDE_DURATION
 	_ai_move_toward(desired_pos, speed_scale)
+
+## Телепорт потерявшегося союзника на его место в формации рядом с лидером. Мгновенно
+## гасит скорость и сбрасывает гистерезис — иначе он тут же снова «догоняет».
+func _ai_warp_near(leader: Player) -> void:
+	global_position = leader.global_position + _ai_follow_offset(leader)
+	velocity = Vector3.ZERO
+	_ai_is_following = false
+	_ai_beside_timer = 0.0
+	state = State.IDLE
 
 ## Вне боя союзник уступает дорогу лидеру: если тот подошёл вплотную и движется прямо на
 ## союзника, союзник делает шаг в сторону (перпендикулярно курсу лидера), освобождая путь.
@@ -849,40 +949,73 @@ func _ai_try_yield(leader: Player) -> bool:
 	_ai_move_toward(global_position + _ai_yield_dir, AI_YIELD_SPEED_SCALE)
 	return true
 
-## Точка следования этого союзника относительно лидера. К месту в формации добавляются
-## личные «живые» поправки:
-## - медленный боковой дрейф (синусоида) — путь слегка гуляет, а не тянется по прямой;
-## - забегание вперёд по ходу движения лидера — нетерпеливые пытаются обогнать;
-## - после догона сильного отставания союзник идёт сбоку от лидера, а не позади.
+## Точка следования этого союзника относительно лидера. Формация повёрнута по курсу
+## лидера (место в строю задано локально: x — вбок, z — назад), поэтому союзники держатся
+## позади-сбоку, а не только строго по мировым осям. К месту добавляются личные поправки:
+## - забегание вперёд по ходу движения — нетерпеливые подтягиваются вровень и обгоняют;
+## - медленный боковой дрейф (синусоида) — путь слегка гуляет, а не тянется по линейке;
+##   дрейф применяется ТОЛЬКО когда лидер идёт: на стоянке точка формации неподвижна, и
+##   союзник спокойно стоит вместо бесконечного подползания в сторону.
+## - после догона сильного отставания союзник идёт сбоку от лидера, плечом к плечу.
 func _ai_follow_offset(leader: Player) -> Vector3:
-	var leader_dir: Vector3 = leader.velocity
-	leader_dir.y = 0.0
-	var leader_moving: bool = leader_dir.length_squared() > 0.25
-	if leader_moving:
-		leader_dir = leader_dir.normalized()
+	var leader_vel: Vector3 = leader.velocity
+	leader_vel.y = 0.0
+	var leader_moving: bool = leader_vel.length_squared() > 0.25
 
-	var sway := Vector3(
-		sin(_ai_time * _ai_sway_freq + _ai_sway_phase),
-		0.0,
-		cos(_ai_time * _ai_sway_freq * 0.8 + _ai_sway_phase * 1.7)
-	) * _ai_sway_amp
+	# Курс лидера: направление движения, а стоя — куда он смотрит (_last_move_dir).
+	var facing: Vector3 = leader_vel.normalized() if leader_moving else leader._last_move_dir
+	facing.y = 0.0
+	facing = facing.normalized() if facing.length_squared() > 0.01 else Vector3.BACK
+	var right: Vector3 = facing.cross(Vector3.UP).normalized()
+
+	# Дрейф — только на ходу; на стоянке точка формации замирает (см. описание метода).
+	var sway := Vector3.ZERO
+	if leader_moving:
+		sway = (right * sin(_ai_time * _ai_sway_freq + _ai_sway_phase)
+			+ facing * cos(_ai_time * _ai_sway_freq * 0.8 + _ai_sway_phase * 1.7)) * _ai_sway_amp
 
 	if _ai_beside_timer > 0.0 and leader_moving:
-		# Идём плечом к плечу: точка сбоку от лидера, перпендикулярно его движению.
-		var side: Vector3 = leader_dir.cross(Vector3.UP) * _ai_beside_side
-		return side * 1.5 + sway * 0.5
+		# Идём плечом к плечу: точка сбоку от лидера, перпендикулярно его курсу.
+		return right * (_ai_beside_side * 1.5) + sway * 0.5
 
-	var offset: Vector3 = _ai_formation_offset() + sway
+	# Локальное место в строю → мировые координаты по курсу лидера (+z назад, x вбок).
+	# В режиме «Ко мне» (GATHER) строй сжимается к лидеру.
+	var local: Vector3 = _ai_formation_offset()
+	if PartySystem.formation_mode == PartySystem.FormationMode.GATHER:
+		local *= AI_GATHER_OFFSET_SCALE
+	var offset: Vector3 = right * local.x - facing * local.z + sway
 	if leader_moving:
-		offset += leader_dir * (_ai_eagerness * 2.5)
+		offset += facing * (_ai_eagerness * 2.5)  # нетерпеливые подтягиваются вперёд
 	return offset
 
-## Фиксированные смещения от лидера для до 4 союзников (макс. отряд — 5 персонажей).
+## Вектор расталкивания с ближайшими союзниками (separation): суммирует толчки «прочь» от
+## каждого живого союзника-ИИ ближе AI_SEPARATION_RADIUS, тем сильнее, чем ближе сосед.
+## Лидер (активный участник) исключён — дистанцию до него держит формация, а не separation.
+## Складывается с точкой следования, поэтому даже стоящие союзники, оказавшись слишком
+## близко, разъезжаются сами — до упора друг в друга физикой.
+func _ai_separation() -> Vector3:
+	var leader := PartySystem.get_active_member()
+	var push := Vector3.ZERO
+	for other in PartySystem.members:
+		if other == self or other == leader or not is_instance_valid(other) or other.state == State.DEAD:
+			continue
+		var away: Vector3 = global_position - other.global_position
+		away.y = 0.0
+		var d: float = away.length()
+		if d >= AI_SEPARATION_RADIUS or d < 0.0001:
+			continue
+		# Линейный спад: вплотную — полная сила, на радиусе — ноль.
+		push += away.normalized() * (1.0 - d / AI_SEPARATION_RADIUS)
+	return push * AI_SEPARATION_STRENGTH
+
+## Локальные смещения места в строю (x — вбок от лидера, z — назад) для до 4 союзников
+## (макс. отряд — 5). Первые двое держатся сбоку-чуть-сзади, остальные — за спиной.
+## Мировая ориентация задаётся курсом лидера в _ai_follow_offset.
 const AI_FORMATION_OFFSETS: Array[Vector3] = [
-	Vector3(1.6, 0.0, 1.2),
-	Vector3(-1.6, 0.0, 1.2),
-	Vector3(1.6, 0.0, -1.2),
-	Vector3(-1.6, 0.0, -1.2),
+	Vector3(1.7, 0.0, 0.6),
+	Vector3(-1.7, 0.0, 0.6),
+	Vector3(1.0, 0.0, 1.9),
+	Vector3(-1.0, 0.0, 1.9),
 ]
 
 ## Возвращает стабильное смещение по порядковому номеру этого союзника среди неактивных
@@ -904,8 +1037,7 @@ func _ai_move_toward(target_pos: Vector3, speed_scale: float = 1.0) -> void:
 		return
 	dir = dir.normalized()
 	_last_move_dir = dir
-	velocity.x = dir.x * MOVE_SPEED * speed_scale
-	velocity.z = dir.z * MOVE_SPEED * speed_scale
+	_ai_accelerate_to(dir * (MOVE_SPEED * speed_scale))
 	state = State.MOVE
 
 func _ai_move_away_from(threat_pos: Vector3) -> void:
@@ -915,15 +1047,21 @@ func _ai_move_away_from(threat_pos: Vector3) -> void:
 		return
 	dir = dir.normalized()
 	_last_move_dir = -dir  # смотрим на цель, даже отступая от неё
-	velocity.x = dir.x * MOVE_SPEED
-	velocity.z = dir.z * MOVE_SPEED
+	_ai_accelerate_to(dir * MOVE_SPEED)
 	state = State.MOVE
 
-## Гасит горизонтальную скорость до нуля и возвращает состояние в IDLE, когда союзнику
-## некуда идти (цель в комфортной дистанции или лидер рядом).
+## Плавно тянет горизонтальную скорость к [param target_vel] с ускорением AI_ACCEL —
+## единая точка разгона/торможения для всего ИИ-движения (следование, бой, лечение,
+## побег, остановка). Вертикальную скорость (гравитацию) не трогает.
+func _ai_accelerate_to(target_vel: Vector3) -> void:
+	var step: float = AI_ACCEL * _ai_delta
+	velocity.x = move_toward(velocity.x, target_vel.x, step)
+	velocity.z = move_toward(velocity.z, target_vel.z, step)
+
+## Плавно гасит горизонтальную скорость до нуля и возвращает состояние в IDLE, когда
+## союзнику некуда идти (цель в комфортной дистанции или лидер рядом).
 func _ai_hold_position() -> void:
-	velocity.x = move_toward(velocity.x, 0.0, MOVE_SPEED)
-	velocity.z = move_toward(velocity.z, 0.0, MOVE_SPEED)
+	_ai_accelerate_to(Vector3.ZERO)
 	if state == State.MOVE and velocity.length_squared() < 0.01:
 		state = State.IDLE
 
