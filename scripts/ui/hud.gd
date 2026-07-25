@@ -52,6 +52,8 @@ var _expanded: bool = false
 var _seen_ids: Dictionary = {}
 ## Картинка портрета активного игрока в TopLeft (обновляется при смене активного участника).
 var _player_portrait_image: TextureRect = null
+## Подпись текущего режима формации отряда (внизу по центру). Строится кодом в _ready.
+var _formation_label: Label = null
 ## Активные тосты ленты в порядке появления (FIFO при переполнении MAX_TOASTS).
 var _toast_nodes: Array[Control] = []
 
@@ -66,10 +68,12 @@ func _ready() -> void:
 	XPSystem.level_up.connect(_on_level_up)
 	_on_level_up(XPSystem.current_level)
 	PartySystem.active_member_changed.connect(_on_active_member_changed)
+	PartySystem.formation_mode_changed.connect(_on_formation_mode_changed)
 	_header_row.gui_input.connect(_on_header_input)
 	_show_all_btn.pressed.connect(_open_states_modal)
 	_build_badge_styles()
 	_build_player_portrait()
+	_build_formation_indicator()
 	_apply_expanded_state()
 	_location_banner.set_world_location(location_name)
 	call_deferred("_connect_player")
@@ -205,6 +209,37 @@ func _build_player_portrait() -> void:
 	style.border_color = PORTRAIT_BORDER
 	border.add_theme_stylebox_override("panel", style)
 	_player_portrait.add_child(border)
+
+# ─── Индикатор формации отряда ──────────────────────────────────────────────
+
+## Строит подпись режима формации внизу по центру. Держится приглушённой, коротко
+## пульсирует ярче при смене режима (см. _on_formation_mode_changed).
+func _build_formation_indicator() -> void:
+	_formation_label = Label.new()
+	_formation_label.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	_formation_label.offset_top = -46
+	_formation_label.offset_bottom = -22
+	_formation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_formation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_formation_label.add_theme_color_override("font_color", NAME_COLOR)
+	_formation_label.add_theme_font_size_override("font_size", 14)
+	$Control.add_child(_formation_label)
+	_update_formation_label(PartySystem.formation_mode)
+	_formation_label.modulate.a = 0.55
+
+func _on_formation_mode_changed(mode: int) -> void:
+	_update_formation_label(mode)
+	if _formation_label == null:
+		return
+	# Короткий пульс, чтобы игрок заметил переключение, затем возврат к приглушённому виду.
+	_formation_label.modulate.a = 1.0
+	var t := _formation_label.create_tween()
+	t.tween_interval(0.8)
+	t.tween_property(_formation_label, "modulate:a", 0.55, 0.5)
+
+func _update_formation_label(mode: int) -> void:
+	if _formation_label != null:
+		_formation_label.text = "Отряд: %s" % PartySystem.formation_mode_name(mode)
 
 func _update_player_portrait(player: Player) -> void:
 	if _player_portrait_image == null or player == null:

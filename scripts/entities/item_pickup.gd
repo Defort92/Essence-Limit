@@ -12,6 +12,7 @@ class_name ItemPickup
 signal picked_up(pickup: ItemPickup)
 
 func _ready() -> void:
+	collision_mask = 2  # слой отряда (party) — подбирают только участники отряда
 	body_entered.connect(_on_body_entered)
 
 func _on_body_entered(body: Node3D) -> void:

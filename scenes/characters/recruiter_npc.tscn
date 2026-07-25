@@ -54,7 +54,7 @@ text = "F — Нанять"
 
 [node name="InteractionArea" type="Area3D" parent="."]
 collision_layer = 0
-collision_mask = 1
+collision_mask = 2
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="InteractionArea"]
 shape = SubResource("SphereShape3D_1")

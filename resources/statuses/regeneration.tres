@@ -1,14 +1,12 @@
-[gd_resource type="Resource" script_class="StatusEffectData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="StatusEffectData" format=3 uid="uid://05cmo57ifxhk"]
 
-[ext_resource type="Script" path="res://scripts/data/status_effect_data.gd" id="1"]
-[ext_resource type="Script" path="res://scripts/data/stat_modifier.gd" id="2"]
+[ext_resource type="Script" uid="uid://dvohq27lxlcop" path="res://scripts/data/status_effect_data.gd" id="1"]
+[ext_resource type="Script" uid="uid://brwochlo0g2bt" path="res://scripts/data/stat_modifier.gd" id="2"]
 
 [sub_resource type="Resource" id="mod_regen"]
 script = ExtResource("2")
 stat = "regen"
-op = 0
 value = 6.0
-source_id = ""
 
 [resource]
 script = ExtResource("1")
@@ -17,6 +15,4 @@ display_name = "Регенерация"
 description = "Целебная аура затягивает раны. Восстанавливает 6 HP в секунду, пока стоишь в зоне."
 glyph = "✚"
 color = Color(0.373, 0.83, 0.478, 1)
-is_debuff = false
-duration = 0.0
-modifiers = [SubResource("mod_regen")]
+modifiers = Array[ExtResource("2")]([SubResource("mod_regen")])

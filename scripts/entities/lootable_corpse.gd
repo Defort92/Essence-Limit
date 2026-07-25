@@ -49,7 +49,7 @@ signal loot_changed()
 func _ready() -> void:
 	add_to_group("lootable")
 	collision_layer = 0
-	collision_mask = 1  # слой игрока/персонажей
+	collision_mask = 2  # слой отряда (party) — обыскивают только участники отряда
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
 	shape.radius = DETECT_RADIUS
