@@ -1,0 +1,263 @@
+[gd_scene format=3 uid="uid://cv0pebupoc7qw"]
+
+[ext_resource type="Texture2D" uid="uid://dva31bmo3y6ap" path="res://assets/sprites/characters/base/front.png" id="1_character"]
+[ext_resource type="Script" uid="uid://doo3dpglgdiiq" path="res://scripts/effects/grass_multimesh_chunk.gd" id="2_grass_chunk"]
+[ext_resource type="Shader" uid="uid://bwlm5br2cecmd" path="res://assets/shaders/dylearn/Grass.gdshader" id="3_grass_shader"]
+[ext_resource type="Texture2D" uid="uid://b40kn8me8ssry" path="res://assets/textures/environment/grass_dylearn.png" id="4_grass_texture"]
+[ext_resource type="Texture2D" uid="uid://b6fhxncxd7b1t" path="res://assets/textures/environment/dylearn/WindNoise.tres" id="5_grass_noise"]
+[ext_resource type="Shader" uid="uid://demwts2obctsl" path="res://assets/shaders/dylearn/Floor.gdshader" id="6_floor_shader"]
+[ext_resource type="Shader" uid="uid://bx4cra71f6k11" path="res://assets/shaders/dylearn/ToonShader.gdshader" id="7_toon_shader"]
+[ext_resource type="Texture2D" uid="uid://vqml4pj02ucs" path="res://assets/textures/environment/dylearn/Albedo2Noise.tres" id="9_albedo_2_noise"]
+[ext_resource type="Texture2D" uid="uid://c52v6tkx73uro" path="res://assets/textures/environment/dylearn/Albedo3Noise.tres" id="10_albedo_3_noise"]
+[ext_resource type="Texture2D" uid="uid://cnyu71qx10i0e" path="res://assets/textures/environment/dylearn/accentleaf.png" id="11_accent_texture"]
+[ext_resource type="Script" uid="uid://du1bomy5amqmr" path="res://scripts/effects/dylearn/ShaderGlobals.gd" id="12_shader_globals"]
+[ext_resource type="Script" uid="uid://6i7mxyjfcni2" path="res://scripts/effects/dylearn/LightDirection.gd" id="13_light_direction"]
+[ext_resource type="Script" path="res://scripts/prototypes/grass_demo_player.gd" id="14_demo_player"]
+[ext_resource type="Script" uid="uid://dha1vebhsho8t" path="res://scripts/components/directional_sprite.gd" id="15_directional_sprite"]
+
+[sub_resource type="Environment" id="Environment_prototype"]
+background_mode = 1
+background_color = Color(0.055, 0.045, 0.065, 1)
+ambient_light_source = 3
+ambient_light_color = Color(0.36, 0.31, 0.42, 1)
+ambient_light_energy = 0.65
+tonemap_mode = 2
+
+[sub_resource type="ShaderMaterial" id="GroundMaterial"]
+render_priority = 0
+shader = ExtResource("6_floor_shader")
+shader_parameter/albedo1 = Color(0.443137, 0.635294, 0, 1)
+shader_parameter/albedo2 = Color(0.556863, 0.678431, 0.211765, 1)
+shader_parameter/albedo2_noise = ExtResource("9_albedo_2_noise")
+shader_parameter/albedo2_scale = 0.11
+shader_parameter/albedo2_threshold = 0.537
+shader_parameter/albedo3 = Color(0.501961, 0.654902, 0.223529, 1)
+shader_parameter/albedo3_noise = ExtResource("10_albedo_3_noise")
+shader_parameter/albedo3_scale = 0.1
+shader_parameter/albedo3_threshold = 0.471
+shader_parameter/cuts = 3
+shader_parameter/wrap = 0.0
+shader_parameter/steepness = 1.0
+
+[sub_resource type="PlaneMesh" id="GroundMesh"]
+material = SubResource("GroundMaterial")
+size = Vector2(18, 18)
+
+[sub_resource type="StandardMaterial3D" id="PathMaterial"]
+albedo_color = Color(0.29, 0.22, 0.16, 1)
+
+[sub_resource type="BoxMesh" id="PathTileMesh"]
+material = SubResource("PathMaterial")
+size = Vector3(2, 0.08, 2)
+
+[sub_resource type="Gradient" id="WhiteGradient"]
+colors = PackedColorArray(1, 1, 1, 1, 1, 1, 1, 1)
+
+[sub_resource type="GradientTexture1D" id="WhiteTexture"]
+gradient = SubResource("WhiteGradient")
+
+[sub_resource type="ShaderMaterial" id="StoneMaterial"]
+render_priority = 0
+shader = ExtResource("7_toon_shader")
+shader_parameter/albedo = Color(0.29, 0.31, 0.32, 1)
+shader_parameter/albedo_texture = SubResource("WhiteTexture")
+shader_parameter/cuts = 3
+shader_parameter/wrap = 0.0
+shader_parameter/steepness = 1.0
+shader_parameter/ambient_floor = 0.28
+
+[sub_resource type="BoxMesh" id="StoneBlockMesh"]
+material = SubResource("StoneMaterial")
+size = Vector3(2, 1.5, 2)
+
+[sub_resource type="StandardMaterial3D" id="WaterMaterial"]
+transparency = 1
+albedo_color = Color(0.08, 0.25, 0.31, 0.82)
+metallic_specular = 0.65
+roughness = 0.25
+
+[sub_resource type="PlaneMesh" id="WaterMesh"]
+material = SubResource("WaterMaterial")
+size = Vector2(5, 5)
+
+[sub_resource type="StandardMaterial3D" id="AccentMaterial"]
+albedo_color = Color(0.46, 0.12, 0.08, 1)
+emission_enabled = true
+emission = Color(0.35, 0.035, 0.01, 1)
+emission_energy_multiplier = 1.6
+
+[sub_resource type="CylinderMesh" id="AccentMesh"]
+material = SubResource("AccentMaterial")
+top_radius = 0.55
+bottom_radius = 0.75
+height = 1.4
+radial_segments = 8
+rings = 1
+
+[sub_resource type="ShaderMaterial" id="GrassMaterial"]
+render_priority = 0
+shader = ExtResource("3_grass_shader")
+shader_parameter/albedo_texture = ExtResource("4_grass_texture")
+shader_parameter/albedo1 = Color(0.443137, 0.635294, 0, 1)
+shader_parameter/albedo2 = Color(0.556863, 0.678431, 0.211765, 1)
+shader_parameter/albedo2_scale = 0.11
+shader_parameter/albedo2_threshold = 0.537
+shader_parameter/albedo2_noise = ExtResource("9_albedo_2_noise")
+shader_parameter/albedo3 = Color(0.501961, 0.654902, 0.223529, 1)
+shader_parameter/albedo3_scale = 0.1
+shader_parameter/albedo3_threshold = 0.471
+shader_parameter/albedo3_noise = ExtResource("10_albedo_3_noise")
+shader_parameter/accent_frequency1 = 0.001
+shader_parameter/accent_texture1 = ExtResource("4_grass_texture")
+shader_parameter/accent_albedo1 = Color(0.603922, 0.717647, 0, 1)
+shader_parameter/accent_height1 = 0.1
+shader_parameter/accent_scale1 = 1.0
+shader_parameter/accent_probability2 = 0.0001
+shader_parameter/accent_texture2 = ExtResource("11_accent_texture")
+shader_parameter/accent_albedo2 = Color(0.423529, 0.603922, 0, 1)
+shader_parameter/accent_height2 = 0.185
+shader_parameter/accent_scale2 = 1.0
+shader_parameter/framerate = 5.0
+shader_parameter/quantised = true
+shader_parameter/world_space_sway = true
+shader_parameter/debug_noise = false
+shader_parameter/world_sway_angle = 60.0
+shader_parameter/fake_perspective_scale = 0.3
+shader_parameter/wind_noise = ExtResource("5_grass_noise")
+shader_parameter/wind_noise_threshold = 0.365
+shader_parameter/wind_noise_scale = 0.071
+shader_parameter/wind_noise_speed = 0.025
+shader_parameter/wind_noise_direction = Vector2(0, 1)
+shader_parameter/noise_diverge_angle = 10.0
+shader_parameter/view_space_sway = true
+shader_parameter/view_sway_speed = 0.1
+shader_parameter/view_sway_angle = 10.0
+shader_parameter/character_displacement = true
+shader_parameter/debug_displacement = false
+shader_parameter/player_displacement_angle_z = 60.0
+shader_parameter/player_displacement_angle_x = 62.7
+shader_parameter/radius_exponent = 0.9
+shader_parameter/character_positions = Array[Vector4]([Vector4(0, 0, 1.4, 0.9), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0)])
+shader_parameter/cuts = 3
+shader_parameter/wrap = 0.0
+shader_parameter/steepness = 1.0
+shader_parameter/threshold_gradient_size = 0.255
+
+[sub_resource type="QuadMesh" id="GrassBladeMesh"]
+size = Vector2(0.2, 0.3)
+center_offset = Vector3(0, 0.15, 0)
+
+[sub_resource type="CapsuleShape3D" id="PrototypePlayerCollision"]
+radius = 0.32
+height = 1.2
+
+[node name="PixelVisualStylePrototype" type="Node3D"]
+
+[node name="World" type="Node3D" parent="."]
+
+[node name="ShaderGlobals" type="Node" parent="World"]
+script = ExtResource("12_shader_globals")
+cloud_contrast = 3.845
+cloud_direction = Vector2(0, -1)
+cloud_diverge_angle = 20.0
+cloud_scale = 40.0
+cloud_speed = -0.01
+cloud_threshold = 0.27
+cloud_shadow_min = 0.2
+cloud_world_y = 50.0
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="World"]
+environment = SubResource("Environment_prototype")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="World"]
+transform = Transform3D(0.81915206, 0.45198438, -0.35312894, 0, 0.6156615, 0.7880107, 0.57357645, -0.6455006, 0.5043204, 0, 0, 0)
+light_color = Color(1, 0.91, 0.77, 1)
+light_energy = 1.25
+shadow_enabled = true
+directional_shadow_mode = 0
+directional_shadow_max_distance = 60.0
+directional_shadow_fade_start = 1.0
+script = ExtResource("13_light_direction")
+
+[node name="OrthographicCamera" type="Camera3D" parent="World"]
+transform = Transform3D(0.707107, -0.353553, 0.612372, 0, 0.866025, 0.5, -0.707107, -0.353553, 0.612372, 8, 10, 8)
+projection = 1
+current = true
+size = 12.0
+near = 0.1
+far = 80.0
+
+[node name="EnvironmentGeometry" type="Node3D" parent="World"]
+
+[node name="Ground" type="MeshInstance3D" parent="World/EnvironmentGeometry"]
+mesh = SubResource("GroundMesh")
+
+[node name="PathTiles" type="Node3D" parent="World/EnvironmentGeometry"]
+
+[node name="PathTile01" type="MeshInstance3D" parent="World/EnvironmentGeometry/PathTiles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0.05, 0)
+mesh = SubResource("PathTileMesh")
+
+[node name="PathTile02" type="MeshInstance3D" parent="World/EnvironmentGeometry/PathTiles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1, 0.05, 0)
+mesh = SubResource("PathTileMesh")
+
+[node name="PathTile03" type="MeshInstance3D" parent="World/EnvironmentGeometry/PathTiles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1, 0.05, 0)
+mesh = SubResource("PathTileMesh")
+
+[node name="PathTile04" type="MeshInstance3D" parent="World/EnvironmentGeometry/PathTiles"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3, 0.05, 0)
+mesh = SubResource("PathTileMesh")
+
+[node name="StoneBlocks" type="Node3D" parent="World/EnvironmentGeometry"]
+
+[node name="StoneBlockLarge" type="MeshInstance3D" parent="World/EnvironmentGeometry/StoneBlocks"]
+transform = Transform3D(1.5, 0, 0, 0, 1.25, 0, 0, 0, 1, -3.8, 0.75, -2.8)
+mesh = SubResource("StoneBlockMesh")
+
+[node name="StoneBlockMedium" type="MeshInstance3D" parent="World/EnvironmentGeometry/StoneBlocks"]
+transform = Transform3D(0.8, 0, 0, 0, 0.8, 0, 0, 0, 0.8, -1.7, 0.75, -3.5)
+mesh = SubResource("StoneBlockMesh")
+
+[node name="WaterTestSurface" type="MeshInstance3D" parent="World/EnvironmentGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.7, 0.04, 3.8)
+mesh = SubResource("WaterMesh")
+
+[node name="LavaShaderPlaceholder" type="MeshInstance3D" parent="World/EnvironmentGeometry"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 0.7, -3.5)
+mesh = SubResource("AccentMesh")
+
+[node name="VegetationChunks" type="Node3D" parent="World"]
+
+[node name="GrassChunk" type="MultiMeshInstance3D" parent="World/VegetationChunks"]
+material_override = SubResource("GrassMaterial")
+cast_shadow = 0
+visibility_range_end = 28.0
+script = ExtResource("2_grass_chunk")
+blade_mesh = SubResource("GrassBladeMesh")
+density_per_square_meter = 55.0
+interactor_path = NodePath("../../Characters/PrototypePlayer")
+
+[node name="Characters" type="Node3D" parent="World"]
+
+[node name="PrototypePlayer" type="CharacterBody3D" parent="World/Characters"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1.4)
+script = ExtResource("14_demo_player")
+movement_bounds = Vector2(8, 8)
+camera_path = NodePath("../../OrthographicCamera")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="World/Characters/PrototypePlayer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.6, 0)
+shape = SubResource("PrototypePlayerCollision")
+
+[node name="Sprite3D" type="Sprite3D" parent="World/Characters/PrototypePlayer"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0)
+pixel_size = 0.019
+billboard = 2
+alpha_cut = 1
+texture_filter = 0
+texture = ExtResource("1_character")
+script = ExtResource("15_directional_sprite")
+tex_front = ExtResource("1_character")
+frames_dir = "res://assets/sprites/characters/base/frames"

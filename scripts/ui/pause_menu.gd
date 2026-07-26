@@ -3,7 +3,6 @@
 ## не показывается поверх него — тот экран сам закроет её по ESC.
 extends CanvasLayer
 
-const CONTROLS_SETTINGS_SCENE := preload("res://scenes/ui/controls_settings.tscn")
 
 @onready var _settings_panel: Panel = $Dim/SettingsPanel
 @onready var _volume_slider: HSlider = $Dim/SettingsPanel/Margin/VBoxContainer/VolumeRow/VolumeSlider
@@ -19,7 +18,7 @@ func _ready() -> void:
 	PauseManager.paused.connect(_on_paused)
 	PauseManager.unpaused.connect(_on_unpaused)
 
-	_controls_panel = CONTROLS_SETTINGS_SCENE.instantiate()
+	_controls_panel = PauseMenuConstants.CONTROLS_SETTINGS_SCENE.instantiate()
 	add_child(_controls_panel)
 	_controls_panel.hide()
 

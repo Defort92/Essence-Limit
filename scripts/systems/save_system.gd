@@ -3,16 +3,14 @@
 ## Является Autoload-синглтоном; регистрировать как "SaveSystem" в Project Settings.
 extends Node
 
-const SAVE_DIR := "user://saves/"
-const MAX_SLOTS := 3
 
 signal game_saved(slot: int)
 signal game_loaded(slot: int)
 
 ## Сохраняет текущее состояние игры в слот [param slot].
 func save(slot: int) -> void:
-	assert(slot >= 0 and slot < MAX_SLOTS, "Неверный номер слота сохранения")
-	DirAccess.make_dir_recursive_absolute(SAVE_DIR)
+	assert(slot >= 0 and slot < SaveSystemConstants.MAX_SLOTS, "Неверный номер слота сохранения")
+	DirAccess.make_dir_recursive_absolute(SaveSystemConstants.SAVE_DIR)
 
 	var save_data := {
 		"version": 2,
@@ -33,7 +31,7 @@ func save(slot: int) -> void:
 		"achievements": AchievementSystem.serialize(),
 	}
 
-	var file := FileAccess.open(SAVE_DIR + "slot_%d.json" % slot, FileAccess.WRITE)
+	var file := FileAccess.open(SaveSystemConstants.SAVE_DIR + "slot_%d.json" % slot, FileAccess.WRITE)
 	if file:
 		file.store_string(JSON.stringify(save_data, "\t"))
 		file.close()
@@ -42,8 +40,8 @@ func save(slot: int) -> void:
 ## Загружает сохранение из слота [param slot].
 ## Возвращает [code]false[/code] если слот пуст или файл повреждён.
 func load_game(slot: int) -> bool:
-	assert(slot >= 0 and slot < MAX_SLOTS, "Неверный номер слота сохранения")
-	var file_path := SAVE_DIR + "slot_%d.json" % slot
+	assert(slot >= 0 and slot < SaveSystemConstants.MAX_SLOTS, "Неверный номер слота сохранения")
+	var file_path := SaveSystemConstants.SAVE_DIR + "slot_%d.json" % slot
 	if not FileAccess.file_exists(file_path):
 		return false
 
@@ -63,11 +61,11 @@ func load_game(slot: int) -> bool:
 
 ## Возвращает [code]true[/code] если в слоте [param slot] есть сохранение.
 func has_save(slot: int) -> bool:
-	return FileAccess.file_exists(SAVE_DIR + "slot_%d.json" % slot)
+	return FileAccess.file_exists(SaveSystemConstants.SAVE_DIR + "slot_%d.json" % slot)
 
 ## Удаляет файл сохранения из слота [param slot].
 func delete_save(slot: int) -> void:
-	var file_path := SAVE_DIR + "slot_%d.json" % slot
+	var file_path := SaveSystemConstants.SAVE_DIR + "slot_%d.json" % slot
 	if FileAccess.file_exists(file_path):
 		DirAccess.remove_absolute(file_path)
 
@@ -76,7 +74,7 @@ func delete_save(slot: int) -> void:
 func get_save_info(slot: int) -> Dictionary:
 	if not has_save(slot):
 		return {}
-	var file := FileAccess.open(SAVE_DIR + "slot_%d.json" % slot, FileAccess.READ)
+	var file := FileAccess.open(SaveSystemConstants.SAVE_DIR + "slot_%d.json" % slot, FileAccess.READ)
 	if not file:
 		return {}
 	var save_data = JSON.parse_string(file.get_as_text())

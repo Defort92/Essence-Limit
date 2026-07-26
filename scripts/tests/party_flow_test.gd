@@ -4,7 +4,6 @@
 # Слот сохранения 2 используется как временный: реальный сейв бэкапится и восстанавливается.
 extends Node3D
 
-const TEST_SLOT_PATH := "user://saves/slot_2.json"
 
 func _ready() -> void:
 	await get_tree().process_frame
@@ -80,7 +79,7 @@ func _ready() -> void:
 	var backup_text := ""
 	var had_real_save := SaveSystem.has_save(2)
 	if had_real_save:
-		var backup_file := FileAccess.open(TEST_SLOT_PATH, FileAccess.READ)
+		var backup_file := FileAccess.open(PartyFlowTestConstants.TEST_SLOT_PATH, FileAccess.READ)
 		if backup_file:
 			backup_text = backup_file.get_as_text()
 			backup_file.close()
@@ -95,7 +94,7 @@ func _ready() -> void:
 		failures.append("роль лекаря не пережила сохранение/загрузку")
 
 	if had_real_save:
-		var restore_file := FileAccess.open(TEST_SLOT_PATH, FileAccess.WRITE)
+		var restore_file := FileAccess.open(PartyFlowTestConstants.TEST_SLOT_PATH, FileAccess.WRITE)
 		if restore_file:
 			restore_file.store_string(backup_text)
 			restore_file.close()

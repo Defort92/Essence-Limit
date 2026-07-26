@@ -16,13 +16,6 @@ var _owner: Node = null
 ## не совпал при снятии модификаторов.
 var _next_uid: int = 0
 
-## Демо-набор статусов, раздаваемых на старте (см. grant_demo_statuses). Оба типа —
-## благо и недуг — чтобы экран состояний был наполнен сразу.
-const DEMO_STATUSES: Array[String] = [
-	"res://resources/statuses/vigor.tres",
-	"res://resources/statuses/blessing.tres",
-	"res://resources/statuses/fatigue.tres",
-]
 
 signal statuses_changed()
 
@@ -90,7 +83,7 @@ func clear_all() -> void:
 ## Раздаёт демо-набор статусов (благ и недугов) — заглушка «как будто выдали на уровне»,
 ## чтобы экран состояний и панель HUD были наполнены до появления реальных источников.
 func grant_demo_statuses() -> void:
-	for path in DEMO_STATUSES:
+	for path in StatusComponentConstants.DEMO_STATUSES:
 		if ResourceLoader.exists(path):
 			apply_status(load(path) as StatusEffectData)
 
@@ -148,5 +141,5 @@ static func format_remaining(remaining: float) -> String:
 		return ""
 	var secs: int = int(ceil(remaining))
 	if secs >= 60:
-		return "%d:%02d" % [secs / 60, secs % 60]
+		return "%d:%02d" % [int(float(secs) / 60.0), secs % 60]
 	return "%dс" % secs

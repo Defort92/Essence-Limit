@@ -11,7 +11,6 @@ extends Control
 @onready var _font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/FontRow/FontOption
 @onready var _body_font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/BodyFontRow/BodyFontOption
 
-const CONTROLS_SETTINGS_SCENE := preload("res://scenes/ui/controls_settings.tscn")
 
 ## Слот, который откроет "Продолжить" (-1 = сохранений нет).
 var _continue_slot: int = -1
@@ -24,7 +23,7 @@ func _ready() -> void:
 	_continue_button.disabled = _continue_slot < 0
 	_settings_overlay.hide()
 
-	_controls_panel = CONTROLS_SETTINGS_SCENE.instantiate()
+	_controls_panel = MainMenuConstants.CONTROLS_SETTINGS_SCENE.instantiate()
 	add_child(_controls_panel)
 	_controls_panel.hide()
 
@@ -92,7 +91,7 @@ func _on_fullscreen_toggled(pressed: bool) -> void:
 
 ## Возвращает первый слот с сохранением (0..MAX_SLOTS-1) или -1 если сохранений нет.
 func _find_last_save_slot() -> int:
-	for slot in SaveSystem.MAX_SLOTS:
+	for slot in SaveSystemConstants.MAX_SLOTS:
 		if SaveSystem.has_save(slot):
 			return slot
 	return -1

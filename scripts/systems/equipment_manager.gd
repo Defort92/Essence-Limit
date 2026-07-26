@@ -10,10 +10,6 @@
 extends Node
 class_name EquipmentManager
 
-const MAX_ACCESSORIES: int = 3
-## Стоимость починки = buy_price / REPAIR_COST_DIVISOR (минимум 1 золото).
-const REPAIR_COST_DIVISOR: int = 4
-
 ## Словарь: int(EquipmentData.Slot) → EquipmentData. Аксессуары хранятся отдельно.
 var _equipped: Dictionary = {}
 var _accessories: Array[EquipmentData] = []
@@ -48,7 +44,7 @@ func equip_from_inventory(item: EquipmentData) -> bool:
 ## Возвращает [code]false[/code] если аксессуарный список заполнен.
 func equip(item: EquipmentData) -> bool:
 	if item.slot == EquipmentData.Slot.ACCESSORY:
-		if _accessories.size() >= MAX_ACCESSORIES:
+		if _accessories.size() >= EquipmentManagerConstants.MAX_ACCESSORIES:
 			return false
 		_accessories.append(item)
 		_broken_accessories.append(false)
@@ -205,13 +201,20 @@ func get_repair_cost(slot: EquipmentData.Slot) -> int:
 	var item: EquipmentData = _equipped.get(slot, null)
 	if item == null:
 		return 0
-	return max(1, item.buy_price / REPAIR_COST_DIVISOR)
+	var repair_cost := int(
+		float(item.buy_price) / float(EquipmentManagerConstants.REPAIR_COST_DIVISOR)
+	)
+	return maxi(1, repair_cost)
 
 ## Возвращает стоимость починки аксессуара с индексом [param index] в золоте.
 func get_accessory_repair_cost(index: int) -> int:
 	if index < 0 or index >= _accessories.size():
 		return 0
-	return max(1, _accessories[index].buy_price / REPAIR_COST_DIVISOR)
+	var repair_cost := int(
+		float(_accessories[index].buy_price)
+		/ float(EquipmentManagerConstants.REPAIR_COST_DIVISOR)
+	)
+	return maxi(1, repair_cost)
 
 ## Чинит предмет в слоте [param slot], списывая золото.
 ## Вызывать только в городе. Возвращает [code]false[/code] если слот пуст,
@@ -249,15 +252,21 @@ func serialize() -> Dictionary:
 	var equipped_data: Dictionary = {}
 	for slot: int in _equipped:
 		var item: EquipmentData = _equipped[slot]
+		var item_path: Variant = null
+		if item != null:
+			item_path = item.resource_path
 		equipped_data[str(slot)] = {
-			"path": item.resource_path if item else null,
+			"path": item_path,
 			"broken": _broken_slots.get(slot, false),
 		}
 	var acc_data: Array = []
 	for idx in _accessories.size():
 		var item: EquipmentData = _accessories[idx]
+		var item_path: Variant = null
+		if item != null:
+			item_path = item.resource_path
 		acc_data.append({
-			"path": item.resource_path if item else null,
+			"path": item_path,
 			"broken": _broken_accessories[idx] if idx < _broken_accessories.size() else false,
 		})
 	return { "equipped": equipped_data, "accessories": acc_data }

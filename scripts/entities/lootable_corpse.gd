@@ -11,23 +11,6 @@
 extends Area3D
 class_name LootableCorpse
 
-## Радиус, в котором появляется подсказка «F — Обыскать».
-const DETECT_RADIUS: float = 1.6
-
-## Русские названия слотов экипировки для отображения в списке лута.
-const SLOT_NAMES := {
-	EquipmentData.Slot.HEAD: "Голова",
-	EquipmentData.Slot.BODY: "Тело",
-	EquipmentData.Slot.LEGS: "Ноги",
-	EquipmentData.Slot.GLOVES: "Перчатки",
-	EquipmentData.Slot.WEAPON_MAIN: "Оружие",
-	EquipmentData.Slot.WEAPON_OFF: "Вторая рука",
-}
-const ARMOR_SLOTS := [
-	EquipmentData.Slot.HEAD, EquipmentData.Slot.BODY,
-	EquipmentData.Slot.LEGS, EquipmentData.Slot.GLOVES,
-	EquipmentData.Slot.WEAPON_MAIN, EquipmentData.Slot.WEAPON_OFF,
-]
 
 ## Плоский лут врага: массив { "item": ItemData, "quantity": int }.
 var loot_items: Array = []
@@ -52,7 +35,7 @@ func _ready() -> void:
 	collision_mask = 2  # слой отряда (party) — обыскивают только участники отряда
 	var col := CollisionShape3D.new()
 	var shape := SphereShape3D.new()
-	shape.radius = DETECT_RADIUS
+	shape.radius = LootableCorpseConstants.DETECT_RADIUS
 	col.shape = shape
 	add_child(col)
 	body_entered.connect(_on_body_changed)
@@ -147,10 +130,10 @@ func get_loot_entries() -> Array:
 		})
 	if source_player != null and is_instance_valid(source_player):
 		var eq: EquipmentManager = source_player.equipment
-		for slot: EquipmentData.Slot in ARMOR_SLOTS:
+		for slot: EquipmentData.Slot in LootableCorpseConstants.ARMOR_SLOTS:
 			var item: EquipmentData = eq.get_equipped(slot)
 			if item != null:
-				var label: String = SLOT_NAMES.get(slot, "?")
+				var label: String = LootableCorpseConstants.SLOT_NAMES.get(slot, "?")
 				entries.append({
 					"text": "%s: %s" % [label, item.display_name],
 					"kind": "equip_slot",

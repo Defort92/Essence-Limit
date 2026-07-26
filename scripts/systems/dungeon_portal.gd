@@ -4,7 +4,6 @@ enum PortalState { CLOSED, OPEN }
 
 var state: PortalState = PortalState.CLOSED
 var current_floor: int = 0
-const MAX_FLOORS: int = 15
 
 signal portal_opened()
 signal portal_closed()
@@ -26,7 +25,7 @@ func close_portal() -> void:
 	current_floor = 0
 
 func enter_floor(floor_index: int) -> void:
-	assert(floor_index >= 1 and floor_index <= MAX_FLOORS)
+	assert(floor_index >= 1 and floor_index <= DungeonPortalConstants.MAX_FLOORS)
 	current_floor = floor_index
 	floor_changed.emit(current_floor)
 

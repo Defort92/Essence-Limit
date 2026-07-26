@@ -4,25 +4,6 @@ extends CanvasLayer
 ## в каждой сцене; в подземелье баннер вместо него показывает «ЭТАЖ N» из DungeonPortal.
 @export var location_name: String = ""
 
-## Как часто (сек) обновляются подписи таймеров статусов в развёрнутой панели.
-const STATUS_TIMER_REFRESH: float = 0.2
-## Сколько секунд «тост» нового статуса живёт в ленте, прежде чем угаснуть.
-const TOAST_LIFETIME: float = 3.0
-## Длительность плавного исчезания тоста.
-const TOAST_FADE: float = 0.4
-## Максимум одновременно видимых тостов в ленте (FIFO — старые вытесняются).
-const MAX_TOASTS: int = 5
-
-const BUFF_ACCENT: Color = Color(0.498, 0.682, 0.384)
-const DEBUFF_ACCENT: Color = Color(0.82, 0.416, 0.29)
-const NAME_COLOR: Color = Color(0.757, 0.675, 0.525)
-const TIMER_COLOR: Color = Color(0.604, 0.545, 0.494)
-## Фон тоста в ленте и фон строки в развёрнутом списке.
-const TOAST_BG: Color = Color(0.039, 0.031, 0.035, 0.82)
-const ROW_BG: Color = Color(0.078, 0.063, 0.055, 0.4)
-
-const PORTRAIT_BG: Color = Color(0.086, 0.067, 0.067)
-const PORTRAIT_BORDER: Color = Color(0.725, 0.541, 0.369, 0.8)
 
 @onready var hp_bar: ProgressBar = $Control/TopLeft/HPContainer/HPBar
 @onready var hp_text: Label = $Control/TopLeft/HPContainer/HPText
@@ -110,7 +91,7 @@ func _process(delta: float) -> void:
 	if _timer_refs.is_empty():
 		return
 	_refresh_accum += delta
-	if _refresh_accum < STATUS_TIMER_REFRESH:
+	if _refresh_accum < HUDConstants.STATUS_TIMER_REFRESH:
 		return
 	_refresh_accum = 0.0
 	for ref in _timer_refs:
@@ -187,7 +168,7 @@ func _build_player_portrait() -> void:
 	_player_portrait.gui_input.connect(_on_player_portrait_input)
 
 	var bg := ColorRect.new()
-	bg.color = PORTRAIT_BG
+	bg.color = HUDConstants.PORTRAIT_BG
 	bg.set_anchors_preset(Control.PRESET_FULL_RECT)
 	bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_player_portrait.add_child(bg)
@@ -206,7 +187,7 @@ func _build_player_portrait() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(0, 0, 0, 0)
 	style.set_border_width_all(2)
-	style.border_color = PORTRAIT_BORDER
+	style.border_color = HUDConstants.PORTRAIT_BORDER
 	border.add_theme_stylebox_override("panel", style)
 	_player_portrait.add_child(border)
 
@@ -221,7 +202,7 @@ func _build_formation_indicator() -> void:
 	_formation_label.offset_bottom = -22
 	_formation_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_formation_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_formation_label.add_theme_color_override("font_color", NAME_COLOR)
+	_formation_label.add_theme_color_override("font_color", HUDConstants.NAME_COLOR)
 	_formation_label.add_theme_font_size_override("font_size", 14)
 	$Control.add_child(_formation_label)
 	_update_formation_label(PartySystem.formation_mode)
@@ -283,11 +264,11 @@ func _process_new_toasts(buffs: Array[Dictionary], debuffs: Array[Dictionary]) -
 	for entry in buffs:
 		current[entry.source_id] = true
 		if not _seen_ids.has(entry.source_id) and not _expanded:
-			_spawn_toast(entry, BUFF_ACCENT)
+			_spawn_toast(entry, HUDConstants.BUFF_ACCENT)
 	for entry in debuffs:
 		current[entry.source_id] = true
 		if not _seen_ids.has(entry.source_id) and not _expanded:
-			_spawn_toast(entry, DEBUFF_ACCENT)
+			_spawn_toast(entry, HUDConstants.DEBUFF_ACCENT)
 	_seen_ids = current
 
 ## Помечает все текущие статусы как «виденные» без всплытия тостов (стартовое наполнение).
@@ -301,19 +282,19 @@ func _seed_seen_ids() -> void:
 		_seen_ids[entry.source_id] = true
 
 func _spawn_toast(entry: Dictionary, accent: Color) -> void:
-	var card := _make_status_card(entry, accent, TOAST_BG, false)
+	var card := _make_status_card(entry, accent, HUDConstants.TOAST_BG, false)
 	card.gui_input.connect(_on_card_input)
 	_ticker.add_child(card)
 	_toast_nodes.append(card)
 	# Живёт TOAST_LIFETIME, затем плавно гаснет и удаляется. Твин привязан к самой
 	# карточке: если её удалят раньше, твин авто-остановится.
 	var life := card.create_tween()
-	life.tween_interval(TOAST_LIFETIME)
-	life.tween_property(card, "modulate:a", 0.0, TOAST_FADE)
+	life.tween_interval(HUDConstants.TOAST_LIFETIME)
+	life.tween_property(card, "modulate:a", 0.0, HUDConstants.TOAST_FADE)
 	life.tween_callback(_remove_toast.bind(card))
 	card.set_meta("life_tween", life)
 	# FIFO: не больше MAX_TOASTS — лишние старые затираются анимацией удаления.
-	while _toast_nodes.size() > MAX_TOASTS:
+	while _toast_nodes.size() > HUDConstants.MAX_TOASTS:
 		_evict_toast(_toast_nodes.pop_front())
 
 ## Обычное истечение времени жизни тоста: убрать из учёта и удалить узел.
@@ -365,17 +346,17 @@ func _rebuild_expanded_list(buffs: Array[Dictionary] = [], debuffs: Array[Dictio
 	if buffs.is_empty() and debuffs.is_empty():
 		var empty := Label.new()
 		empty.text = "Активных состояний нет."
-		empty.add_theme_color_override("font_color", TIMER_COLOR)
+		empty.add_theme_color_override("font_color", HUDConstants.TIMER_COLOR)
 		empty.add_theme_font_size_override("font_size", 13)
 		_status_list.add_child(empty)
 		return
 	for entry in buffs:
-		_add_expanded_row(entry, BUFF_ACCENT)
+		_add_expanded_row(entry, HUDConstants.BUFF_ACCENT)
 	for entry in debuffs:
-		_add_expanded_row(entry, DEBUFF_ACCENT)
+		_add_expanded_row(entry, HUDConstants.DEBUFF_ACCENT)
 
 func _add_expanded_row(entry: Dictionary, accent: Color) -> void:
-	var card := _make_status_card(entry, accent, ROW_BG, true)
+	var card := _make_status_card(entry, accent, HUDConstants.ROW_BG, true)
 	card.gui_input.connect(_on_card_input)
 	_status_list.add_child(card)
 
@@ -425,14 +406,14 @@ func _make_status_card(entry: Dictionary, accent: Color, bg: Color, track_timer:
 	name_label.text = data.display_name
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	name_label.add_theme_color_override("font_color", NAME_COLOR)
+	name_label.add_theme_color_override("font_color", HUDConstants.NAME_COLOR)
 	name_label.add_theme_font_size_override("font_size", 14)
 	row.add_child(name_label)
 
 	var timer_label := Label.new()
 	timer_label.text = StatusComponent.format_remaining(entry.remaining)
 	timer_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	timer_label.add_theme_color_override("font_color", TIMER_COLOR)
+	timer_label.add_theme_color_override("font_color", HUDConstants.TIMER_COLOR)
 	timer_label.add_theme_font_size_override("font_size", 13)
 	row.add_child(timer_label)
 	if track_timer:

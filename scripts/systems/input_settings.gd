@@ -7,7 +7,6 @@
 ## в черновике UI и на игру не влияют.
 extends Node
 
-const SETTINGS_PATH := "user://settings.cfg"
 
 ## Способ передвижения персонажа. KEYBOARD — WASD/стрелки, MOUSE — бег к точке по ПКМ.
 enum MovementMode { KEYBOARD, MOUSE }
@@ -26,7 +25,7 @@ func _ready() -> void:
 ## значения по умолчанию из project.godot.
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) != OK:
+	if cfg.load(InputSettingsConstants.SETTINGS_PATH) != OK:
 		movement_mode = MovementMode.KEYBOARD
 		return
 	movement_mode = int(cfg.get_value("controls", "movement_mode", 0)) as MovementMode
@@ -64,7 +63,7 @@ func action_key_label(action: String, fallback: String = "—") -> String:
 	return keycode_label(keycode)
 
 ## Человекочитаемое имя клавиши по её физическому keycode (для текущей раскладки).
-static func keycode_label(physical_keycode: int) -> String:
+func keycode_label(physical_keycode: int) -> String:
 	if physical_keycode == 0:
 		return "—"
 	var logical := DisplayServer.keyboard_get_keycode_from_physical(physical_keycode)
@@ -81,7 +80,7 @@ func _apply_binding(action: String, physical_keycode: int) -> void:
 		if ev is InputEventKey:
 			InputMap.action_erase_event(action, ev)
 	var key_event := InputEventKey.new()
-	key_event.physical_keycode = physical_keycode
+	key_event.physical_keycode = physical_keycode as Key
 	InputMap.action_add_event(action, key_event)
 
 func _save_to_disk(bindings: Dictionary) -> void:
@@ -89,4 +88,4 @@ func _save_to_disk(bindings: Dictionary) -> void:
 	cfg.set_value("controls", "movement_mode", int(movement_mode))
 	for action in bindings:
 		cfg.set_value("keybinds", str(action), int(bindings[action]))
-	cfg.save(SETTINGS_PATH)
+	cfg.save(InputSettingsConstants.SETTINGS_PATH)

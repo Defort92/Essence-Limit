@@ -5,8 +5,6 @@
 ## Является Autoload-синглтоном; регистрировать как "XPSystem" в Project Settings.
 extends Node
 
-const MAX_LEVEL := 100
-const MIN_LEVEL := 1
 
 var current_xp: int = 0
 var current_level: int = 1
@@ -42,7 +40,7 @@ func try_award_boss_kill_xp(floor_id: int, xp_reward: int) -> void:
 ## Сохраняет XP нетронутым — при снятии эффекта уровень восстанавливается через restore_level().
 ## Слоты эссенций блокируются, но не уничтожаются.
 func reduce_level(amount: int) -> void:
-	var new_level: int = max(MIN_LEVEL, current_level - amount)
+	var new_level: int = max(XPSystemConstants.MIN_LEVEL, current_level - amount)
 	if new_level == current_level:
 		return
 	current_level = new_level
@@ -66,19 +64,19 @@ func on_run_started() -> void:
 
 ## Возвращает количество XP, недостающих до следующего уровня.
 func xp_to_next_level() -> int:
-	if current_level >= MAX_LEVEL:
+	if current_level >= XPSystemConstants.MAX_LEVEL:
 		return 0
 	return _xp_for_level(current_level + 1) - current_xp
 
 func _add_xp(amount: int) -> void:
-	if current_level >= MAX_LEVEL:
+	if current_level >= XPSystemConstants.MAX_LEVEL:
 		return
 	current_xp += amount
 	xp_gained.emit(amount, current_xp)
 	_check_level_up()
 
 func _check_level_up() -> void:
-	while current_level < MAX_LEVEL and current_xp >= _xp_for_level(current_level + 1):
+	while current_level < XPSystemConstants.MAX_LEVEL and current_xp >= _xp_for_level(current_level + 1):
 		current_level += 1
 		_resize_all_essences()
 		level_up.emit(current_level)
@@ -91,8 +89,8 @@ func _resize_all_essences() -> void:
 
 ## Вычисляет фактический уровень по накопленному XP без изменения состояния.
 func _calculate_level_from_xp() -> int:
-	var level := MIN_LEVEL
-	while level < MAX_LEVEL and current_xp >= _xp_for_level(level + 1):
+	var level := XPSystemConstants.MIN_LEVEL
+	while level < XPSystemConstants.MAX_LEVEL and current_xp >= _xp_for_level(level + 1):
 		level += 1
 	return level
 

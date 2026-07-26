@@ -10,7 +10,7 @@ class_name CompanionData
 enum Role { FIGHTER, HEALER }
 
 @export var display_name: String = ""
-## Раса определяет базовые статы (GameManager.RACE_BASE_STATS).
+## Раса определяет базовые статы (GameManagerConstants.RACE_BASE_STATS).
 ## Порядок значений совпадает с GameManager.Race.
 @export_enum("Человек", "Варвар", "Эльф", "Демон", "Ангел") var race: int = 0
 @export var combat_role: Role = Role.FIGHTER

@@ -4,8 +4,6 @@
 ## Является Autoload-синглтоном; регистрировать как "LootSpawner" в Project Settings.
 extends Node
 
-## Смещение по Y, чтобы тело не проваливалось сквозь пол.
-const SPAWN_Y_OFFSET: float = 0.1
 
 ## Подписывает врага на систему лута. Вызывается из Enemy._ready().
 ## Враг привязан как доп. аргумент — обработчик читает его спрайт для визуального трупа
@@ -31,7 +29,7 @@ func _on_loot_dropped(items: Array, gold: int, at_position: Vector3, enemy: Enem
 		corpse.corpse_texture = visual.texture
 		corpse.corpse_tint = visual.tint
 	parent.add_child(corpse)
-	corpse.global_position = at_position + Vector3(0.0, SPAWN_Y_OFFSET, 0.0)
+	corpse.global_position = at_position + Vector3(0.0, LootSpawnerConstants.SPAWN_Y_OFFSET, 0.0)
 
 ## Сворачивает список ItemData в записи { "item", "quantity" }, объединяя одинаковые id.
 func _aggregate_items(items: Array) -> Array:

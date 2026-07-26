@@ -31,11 +31,6 @@ class_name DirectionalSprite3D
 @export var idle_fps: float = 6.0
 @export var walk_fps: float = 10.0
 
-## Подпапки ракурсов в порядке секторов (индекс = сектор из face_direction).
-const DIR_FOLDERS: PackedStringArray = [
-	"front", "front-right", "full-right", "rear-right",
-	"back", "rear-left", "full-left", "front-left",
-]
 
 var _textures: Array[Texture2D] = []
 var _current_index: int = -1
@@ -75,7 +70,7 @@ func _load_animation_frames() -> void:
 	_idle_frames.resize(8)
 	_walk_frames.resize(8)
 	for sector in 8:
-		var dir_path: String = frames_dir.path_join(DIR_FOLDERS[sector])
+		var dir_path: String = frames_dir.path_join(DirectionalSpriteConstants.DIR_FOLDERS[sector])
 		var idle_series: Array[Texture2D] = _load_series(dir_path, "idle")
 		var walk_series: Array[Texture2D] = _load_series(dir_path, "walk")
 		_idle_frames[sector] = idle_series

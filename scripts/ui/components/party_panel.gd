@@ -5,29 +5,6 @@
 ## только при смене состава (спавн/уход союзников, смена активного).
 extends Control
 
-## Порог доверия → «настроение»: подпись и цвет рамки/точки/подписи карточки.
-## Проверяются по убыванию; первое подходящее и берётся.
-const MORALE_TIERS: Array[Dictionary] = [
-	{ "min": 75, "label": "Спокоен",    "color": Color(0.435, 0.682, 0.384) },
-	{ "min": 50, "label": "Встревожен", "color": Color(0.839, 0.635, 0.306) },
-	{ "min": 25, "label": "Дрогнул",    "color": Color(0.839, 0.404, 0.184) },
-	{ "min":  0, "label": "Безумие",    "color": Color(0.722, 0.157, 0.110) },
-]
-
-const NAME_COLOR: Color = Color(0.780, 0.710, 0.600)
-const LEVEL_COLOR: Color = Color(0.910, 0.863, 0.769)
-const HEADER_COLOR: Color = Color(0.490, 0.447, 0.408)
-const PORTRAIT_BG: Color = Color(0.086, 0.067, 0.067)
-const HP_BG: Color = Color(0.102, 0.039, 0.035)
-const HP_FILL: Color = Color(0.722, 0.157, 0.110)
-## Цвет полосы HP, когда здоровья мало (доля ниже этого порога) — тревожный ярко-красный.
-const HP_LOW_FILL: Color = Color(0.847, 0.290, 0.165)
-const HP_LOW_THRESHOLD: float = 0.30
-
-const PORTRAIT_SIZE: float = 58.0
-const CARD_WIDTH: float = 82.0
-## Как часто (сек) обновляются значения карточек и проверяется смена состава отряда.
-const REFRESH_INTERVAL: float = 0.15
 
 @onready var _cards_row: HBoxContainer = $Root/CardsRow
 
@@ -40,7 +17,7 @@ var _accum: float = 0.0
 
 func _process(delta: float) -> void:
 	_accum += delta
-	if _accum < REFRESH_INTERVAL:
+	if _accum < PartyPanelConstants.REFRESH_INTERVAL:
 		return
 	_accum = 0.0
 	var members := _visible_members()
@@ -74,14 +51,14 @@ func _rebuild(members: Array[Player]) -> void:
 
 func _build_card(member: Player) -> Control:
 	var card := VBoxContainer.new()
-	card.custom_minimum_size = Vector2(CARD_WIDTH, 0)
+	card.custom_minimum_size = Vector2(PartyPanelConstants.CARD_WIDTH, 0)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	card.add_theme_constant_override("separation", 3)
 	card.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	# --- Портрет с рамкой, уровнем, точкой-индикатором и полосой HP ---
 	var portrait := Control.new()
-	portrait.custom_minimum_size = Vector2(PORTRAIT_SIZE, PORTRAIT_SIZE)
+	portrait.custom_minimum_size = Vector2(PartyPanelConstants.PORTRAIT_SIZE, PartyPanelConstants.PORTRAIT_SIZE)
 	portrait.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	# STOP (не IGNORE, как у остальных декоративных детей карточки) — портрет кликабелен,
 	# открывает экран персонажа/инвентаря для этого союзника.
@@ -106,7 +83,7 @@ func _build_card(member: Player) -> Control:
 	var level_label := Label.new()
 	level_label.position = Vector2(2, 0)
 	level_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	level_label.add_theme_color_override("font_color", LEVEL_COLOR)
+	level_label.add_theme_color_override("font_color", PartyPanelConstants.LEVEL_COLOR)
 	level_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.9))
 	level_label.add_theme_constant_override("shadow_offset_y", 1)
 	level_label.add_theme_font_size_override("font_size", 12)
@@ -114,7 +91,7 @@ func _build_card(member: Player) -> Control:
 
 	var dot := Panel.new()
 	dot.custom_minimum_size = Vector2(11, 11)
-	dot.position = Vector2(PORTRAIT_SIZE - 7, -4)
+	dot.position = Vector2(PartyPanelConstants.PORTRAIT_SIZE - 7, -4)
 	dot.size = Vector2(11, 11)
 	dot.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var style_dot := StyleBoxFlat.new()
@@ -126,7 +103,7 @@ func _build_card(member: Player) -> Control:
 
 	# Полоса HP по нижней кромке портрета.
 	var hp_bar := ColorRect.new()
-	hp_bar.color = HP_BG
+	hp_bar.color = PartyPanelConstants.HP_BG
 	hp_bar.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	hp_bar.offset_top = -7
 	hp_bar.offset_bottom = 0
@@ -134,7 +111,7 @@ func _build_card(member: Player) -> Control:
 	portrait.add_child(hp_bar)
 
 	var hp_fill := ColorRect.new()
-	hp_fill.color = HP_FILL
+	hp_fill.color = PartyPanelConstants.HP_FILL
 	hp_fill.set_anchors_preset(Control.PRESET_LEFT_WIDE)
 	hp_fill.anchor_right = 1.0
 	hp_fill.offset_right = 0
@@ -148,8 +125,8 @@ func _build_card(member: Player) -> Control:
 	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	name_label.clip_text = true
-	name_label.custom_minimum_size = Vector2(CARD_WIDTH, 0)
-	name_label.add_theme_color_override("font_color", NAME_COLOR)
+	name_label.custom_minimum_size = Vector2(PartyPanelConstants.CARD_WIDTH, 0)
+	name_label.add_theme_color_override("font_color", PartyPanelConstants.NAME_COLOR)
 	name_label.add_theme_font_size_override("font_size", 14)
 	card.add_child(name_label)
 
@@ -180,7 +157,7 @@ func _make_portrait_image(member: Player) -> Control:
 		tex.clip_contents = true
 		return tex
 	var placeholder := ColorRect.new()
-	placeholder.color = PORTRAIT_BG
+	placeholder.color = PartyPanelConstants.PORTRAIT_BG
 	return placeholder
 
 ## Обновляет динамические поля карточек (уровень, HP, настроение) без пересборки узлов.
@@ -212,7 +189,7 @@ func _update_values(members: Array[Player]) -> void:
 		var hp_fill: ColorRect = refs.hp_fill
 		hp_fill.anchor_right = ratio
 		hp_fill.offset_right = 0
-		hp_fill.color = HP_LOW_FILL if ratio < HP_LOW_THRESHOLD else HP_FILL
+		hp_fill.color = PartyPanelConstants.HP_LOW_FILL if ratio < PartyPanelConstants.HP_LOW_THRESHOLD else PartyPanelConstants.HP_FILL
 
 ## Клик по портрету союзника — открыть экран персонажа/инвентаря сразу на нём.
 func _on_portrait_input(event: InputEvent, member: Player) -> void:
@@ -222,7 +199,7 @@ func _on_portrait_input(event: InputEvent, member: Player) -> void:
 			modal.open(member)
 
 func _morale_for(trust: int) -> Dictionary:
-	for tier in MORALE_TIERS:
+	for tier in PartyPanelConstants.MORALE_TIERS:
 		if trust >= int(tier.min):
 			return tier
-	return MORALE_TIERS[MORALE_TIERS.size() - 1]
+	return PartyPanelConstants.MORALE_TIERS[PartyPanelConstants.MORALE_TIERS.size() - 1]

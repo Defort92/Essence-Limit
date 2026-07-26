@@ -4,8 +4,7 @@
 extends ColorRect
 class_name UISeparator
 
-const LINE_COLOR := Color(0.471, 0.376, 0.212, 0.16)
 
 func _ready() -> void:
-	color = LINE_COLOR
+	color = UISeparatorConstants.LINE_COLOR
 	custom_minimum_size = Vector2(0, 1)

@@ -5,10 +5,6 @@ extends Node
 
 enum Race { HUMAN, BARBARIAN, ELF, DEMON, ANGEL }
 
-## Золото — обычный (стакающийся) предмет в личном рюкзаке персонажа, а не общий счётчик:
-## у каждого участника отряда своя пачка золота-предмета в InventoryComponent.
-## GameManager.gold — сумма по всему отряду, только для отображения (лавка, HUD этажа).
-const GOLD_ITEM: ItemData = preload("res://resources/items/gold.tres")
 
 var player_race: Race = Race.HUMAN
 var player_name: String = ""
@@ -22,29 +18,12 @@ signal gold_changed(new_amount: int)
 signal new_game_started(race: Race, player_name: String)
 signal player_died()
 
-## Начальные статы при создании персонажа.
-const RACE_BASE_STATS := {
-	Race.HUMAN:     { "max_health": 100, "strength": 10, "agility": 10, "intellect": 10 },
-	Race.BARBARIAN: { "max_health": 150, "strength": 14, "agility":  8, "intellect":  5 },
-	Race.ELF:       { "max_health":  80, "strength":  7, "agility": 15, "intellect": 10 },
-	Race.DEMON:     { "max_health": 100, "strength": 13, "agility": 12, "intellect":  7 },
-	Race.ANGEL:     { "max_health":  90, "strength":  8, "agility": 10, "intellect": 15 },
-}
-
-## Прибавка к max_health за каждый уровень.
-const RACE_LEVEL_HP_BONUS := {
-	Race.HUMAN:     5,
-	Race.BARBARIAN: 10,
-	Race.ELF:       3,
-	Race.DEMON:     5,
-	Race.ANGEL:     4,
-}
 
 ## Сбрасывает все игровые системы и запускает новую игру с выбранной расой и именем.
 ## Вызывать из экрана создания персонажа перед сменой сцены.
-func new_game(race: Race, name: String) -> void:
+func new_game(race: Race, character_name: String) -> void:
 	player_race = race
-	player_name = name
+	player_name = character_name
 	gold_changed.emit(gold)
 
 	XPSystem.current_xp = 0
@@ -61,7 +40,7 @@ func new_game(race: Race, name: String) -> void:
 	RacialPassiveSystem.clear()
 	AchievementSystem.clear()
 
-	new_game_started.emit(race, name)
+	new_game_started.emit(race, character_name)
 
 ## Обрабатывает вайп отряда: закрывает портал, испускает сигнал и открывает экран смерти.
 ## Вызывается PartySystem, когда погибли все участники. HP восстановится через roster:
@@ -73,11 +52,11 @@ func on_player_died() -> void:
 
 ## Возвращает стартовые статы для [param race].
 func get_race_base_stats(race: Race) -> Dictionary:
-	return RACE_BASE_STATS.get(race, RACE_BASE_STATS[Race.HUMAN])
+	return GameManagerConstants.RACE_BASE_STATS.get(race, GameManagerConstants.RACE_BASE_STATS[Race.HUMAN])
 
 ## Возвращает бонус HP за один уровень для [param race].
 func get_race_level_bonus(race: Race) -> Dictionary:
-	return { "max_health": RACE_LEVEL_HP_BONUS.get(race, 5) }
+	return { "max_health": GameManagerConstants.RACE_LEVEL_HP_BONUS.get(race, 5) }
 
 ## Добавляет [param amount] золота в рюкзак активного участника отряда и испускает сигнал.
 func add_gold(amount: int) -> void:
@@ -87,7 +66,7 @@ func add_gold(amount: int) -> void:
 	if inv == null:
 		push_warning("GameManager.add_gold: нет активного участника отряда, золото потеряно")
 		return
-	inv.add_item(GOLD_ITEM, amount)
+	inv.add_item(GameManagerConstants.GOLD_ITEM, amount)
 	gold_changed.emit(gold)
 
 ## Тратит [param amount] золота. Списывается сперва у активного персонажа, затем —
@@ -103,11 +82,11 @@ func spend_gold(amount: int) -> bool:
 	for member in _spend_order():
 		if remaining <= 0:
 			break
-		var have := member.inventory.get_item_count(GOLD_ITEM.id)
+		var have := member.inventory.get_item_count(GameManagerConstants.GOLD_ITEM.id)
 		if have <= 0:
 			continue
 		var take: int = min(have, remaining)
-		member.inventory.remove_item(GOLD_ITEM.id, take)
+		member.inventory.remove_item(GameManagerConstants.GOLD_ITEM.id, take)
 		remaining -= take
 	gold_changed.emit(gold)
 	return true
@@ -116,7 +95,7 @@ func _total_gold() -> int:
 	var total := 0
 	for member in PartySystem.members:
 		if is_instance_valid(member):
-			total += member.inventory.get_item_count(GOLD_ITEM.id)
+			total += member.inventory.get_item_count(GameManagerConstants.GOLD_ITEM.id)
 	return total
 
 ## Порядок списания золота: активный участник первым, затем остальные живые участники.
