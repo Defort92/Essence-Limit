@@ -2,6 +2,7 @@ shader_type spatial;
 render_mode diffuse_burley;
 
 #include "res://assets/shaders/dylearn/clouds.gdshaderinc"
+#include "res://assets/shaders/main_terrain_constants.gdshaderinc"
 
 uniform sampler2D soil_texture_01 : source_color, repeat_enable, filter_linear_mipmap;
 uniform sampler2D soil_texture_02 : source_color, repeat_enable, filter_linear_mipmap;
@@ -27,12 +28,14 @@ uniform float grass_patch_03_scale : hint_range(0.001, 0.5, 0.001) = 0.1;
 uniform float grass_patch_02_threshold : hint_range(0.0, 1.0, 0.001) = 0.537;
 uniform float grass_patch_03_threshold : hint_range(0.0, 1.0, 0.001) = 0.471;
 uniform float grass_patch_softness : hint_range(0.001, 0.25, 0.001) = 0.055;
+uniform float terrain_roughness : hint_range(0.0, 1.0, 0.01) = 0.96;
+uniform float terrain_specular : hint_range(0.0, 1.0, 0.01) = 0.12;
 
 varying vec3 world_position;
 
 
 float hash_2d(vec2 point) {
-	return fract(sin(dot(point, vec2(127.1, 311.7))) * 43758.5453123);
+	return fract(sin(dot(point, TERRAIN_HASH_VECTOR)) * TERRAIN_HASH_SCALE);
 }
 
 
@@ -64,16 +67,29 @@ void fragment() {
 	vec2 soil_uv = world_xz / soil_texture_world_size;
 	vec2 grass_uv = world_xz / grass_texture_world_size;
 
-	float soil_mix_noise = value_noise(world_xz * 0.16);
+	float soil_mix_noise = value_noise(world_xz * SOIL_MIX_NOISE_SCALE);
 	vec3 soil_01 = texture(soil_texture_01, soil_uv).rgb;
-	vec3 soil_02 = texture(soil_texture_02, soil_uv + vec2(0.37, 0.19)).rgb;
-	vec3 soil = mix(soil_01, soil_02, smoothstep(0.38, 0.68, soil_mix_noise));
+	vec3 soil_02 = texture(soil_texture_02, soil_uv + SOIL_SECOND_TEXTURE_OFFSET).rgb;
+	vec3 soil = mix(
+		soil_01,
+		soil_02,
+		smoothstep(SOIL_BLEND_START, SOIL_BLEND_END, soil_mix_noise)
+	);
 	soil *= soil_tint.rgb;
 
 	vec3 grass_01 = texture(grass_texture_01, grass_uv).rgb;
-	vec3 grass_02 = texture(grass_texture_02, grass_uv * 0.93 + vec2(0.41, 0.23)).rgb;
-	float grass_mix_noise = value_noise(world_xz * 0.11 + vec2(17.0, 9.0));
-	vec3 grass = mix(grass_01, grass_02, smoothstep(0.28, 0.72, grass_mix_noise));
+	vec3 grass_02 = texture(
+		grass_texture_02,
+		grass_uv * GRASS_SECOND_TEXTURE_SCALE + GRASS_SECOND_TEXTURE_OFFSET
+	).rgb;
+	float grass_mix_noise = value_noise(
+		world_xz * GRASS_MIX_NOISE_SCALE + GRASS_MIX_NOISE_OFFSET
+	);
+	vec3 grass = mix(
+		grass_01,
+		grass_02,
+		smoothstep(GRASS_BLEND_START, GRASS_BLEND_END, grass_mix_noise)
+	);
 	grass *= grass_tint.rgb;
 	float patch_02_noise = texture(grass_patch_noise_02, world_xz * grass_patch_02_scale).r;
 	float patch_03_noise = texture(grass_patch_noise_03, world_xz * grass_patch_03_scale).r;
@@ -87,15 +103,27 @@ void fragment() {
 		grass_patch_03_threshold + grass_patch_softness,
 		patch_03_noise
 	);
-	grass *= mix(vec3(1.0), grass_patch_02_tint.rgb, patch_02 * 0.72);
-	grass = mix(grass, grass * grass_patch_03_tint.rgb, patch_03 * 0.78);
+	grass *= mix(
+		vec3(1.0),
+		grass_patch_02_tint.rgb,
+		patch_02 * GRASS_PATCH_02_BLEND_STRENGTH
+	);
+	grass = mix(
+		grass,
+		grass * grass_patch_03_tint.rgb,
+		patch_03 * GRASS_PATCH_03_BLEND_STRENGTH
+	);
 
 	float grass_coverage = texture(grass_coverage_mask, terrain_uv).a;
-	grass_coverage = smoothstep(0.08, 0.92, grass_coverage);
+	grass_coverage = smoothstep(
+		GRASS_COVERAGE_BLEND_START,
+		GRASS_COVERAGE_BLEND_END,
+		grass_coverage
+	);
 	ALBEDO = mix(soil, grass, grass_coverage);
 	ALBEDO = mix(ALBEDO, ALBEDO * terrain_filter_color.rgb, terrain_filter_strength);
 	float cloud_light = get_cloud_noise(world_position);
 	ALBEDO *= mix(1.0, cloud_light, cloud_shadow_strength);
-	ROUGHNESS = 0.96;
-	SPECULAR = 0.12;
+	ROUGHNESS = terrain_roughness;
+	SPECULAR = terrain_specular;
 }

@@ -5,8 +5,6 @@
 ## в UIModalScreen. Показывает снимок на момент открытия; живой отсчёт идёт в ленте HUD.
 extends UIModalScreen
 
-const BUFF_ACCENT := Color(0.498, 0.682, 0.384)
-const DEBUFF_ACCENT := Color(0.82, 0.416, 0.29)
 
 @onready var _title_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox/TitleLabel
 @onready var _subtitle_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox/SubtitleLabel
@@ -61,8 +59,8 @@ func _refresh() -> void:
 	_buffs_header.text = "БЛАГА · %d" % buffs.size()
 	_debuffs_header.text = "НЕДУГИ · %d" % debuffs.size()
 
-	_populate(_buffs_list, buffs, BUFF_ACCENT, "Благ пока нет.")
-	_populate(_debuffs_list, debuffs, DEBUFF_ACCENT, "Недугов пока нет.")
+	_populate(_buffs_list, buffs, StatesScreenConstants.BUFF_ACCENT, "Благ пока нет.")
+	_populate(_debuffs_list, debuffs, StatesScreenConstants.DEBUFF_ACCENT, "Недугов пока нет.")
 
 func _populate(list: VBoxContainer, entries: Array[Dictionary], accent: Color, empty_text: String) -> void:
 	for child in list.get_children():

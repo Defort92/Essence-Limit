@@ -6,7 +6,6 @@
 extends Node
 class_name InventoryComponent
 
-const MAX_SLOTS: int = 30
 
 var _slots: Array = []
 
@@ -34,7 +33,7 @@ func add_item(item: ItemData, quantity: int = 1) -> bool:
 					return true
 
 	while quantity > 0:
-		if _slots.size() >= MAX_SLOTS:
+		if _slots.size() >= InventorySystemConstants.MAX_SLOTS:
 			# Частичное добавление состоялось — UI должен обновиться.
 			if any_added:
 				inventory_changed.emit()
@@ -87,7 +86,7 @@ func get_slots() -> Array:
 
 ## Возвращает [code]true[/code] если все ячейки заняты.
 func is_full() -> bool:
-	return _slots.size() >= MAX_SLOTS
+	return _slots.size() >= InventorySystemConstants.MAX_SLOTS
 
 ## Очищает рюкзак полностью.
 func clear() -> void:

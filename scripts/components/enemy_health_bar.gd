@@ -5,26 +5,22 @@
 extends Node3D
 class_name EnemyHealthBar
 
-const BAR_WIDTH: float = 1.0
-const BAR_HEIGHT: float = 0.13
-const BG_COLOR: Color = Color(0.08, 0.05, 0.05, 0.85)
-const FILL_COLOR: Color = Color(0.85, 0.12, 0.12, 1.0)
 
 var _fill: MeshInstance3D = null
 var _fill_mesh: QuadMesh = null
 var _ratio: float = 1.0
 
 func _ready() -> void:
-	var bg: MeshInstance3D = _make_quad(BG_COLOR, 0)
+	var bg: MeshInstance3D = _make_quad(EnemyHealthBarConstants.BG_COLOR, 0)
 	add_child(bg)
-	_fill = _make_quad(FILL_COLOR, 1)
+	_fill = _make_quad(EnemyHealthBarConstants.FILL_COLOR, 1)
 	_fill_mesh = _fill.mesh as QuadMesh
 	add_child(_fill)
 	_apply_ratio()
 
 func _make_quad(color: Color, priority: int) -> MeshInstance3D:
 	var mesh := QuadMesh.new()
-	mesh.size = Vector2(BAR_WIDTH, BAR_HEIGHT)
+	mesh.size = Vector2(EnemyHealthBarConstants.BAR_WIDTH, EnemyHealthBarConstants.BAR_HEIGHT)
 	var mat := StandardMaterial3D.new()
 	mat.albedo_color = color
 	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
@@ -50,7 +46,7 @@ func _apply_ratio() -> void:
 	if _fill_mesh == null:
 		return
 	var r: float = clampf(_ratio, 0.0, 1.0)
-	var w: float = maxf(BAR_WIDTH * r, 0.001)
-	_fill_mesh.size = Vector2(w, BAR_HEIGHT)
-	_fill_mesh.center_offset = Vector3(-(BAR_WIDTH - w) * 0.5, 0.0, 0.0)
+	var w: float = maxf(EnemyHealthBarConstants.BAR_WIDTH * r, 0.001)
+	_fill_mesh.size = Vector2(w, EnemyHealthBarConstants.BAR_HEIGHT)
+	_fill_mesh.center_offset = Vector3(-(EnemyHealthBarConstants.BAR_WIDTH - w) * 0.5, 0.0, 0.0)
 	_fill.visible = r > 0.0

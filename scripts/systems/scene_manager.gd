@@ -32,7 +32,7 @@ func go_to_race_start(race: GameManager.Race) -> void:
 
 ## Переход на этаж подземелья. floor_num: 1–15.
 func go_to_dungeon_floor(floor_num: int) -> void:
-	assert(floor_num >= 1 and floor_num <= DungeonPortal.MAX_FLOORS)
+	assert(floor_num >= 1 and floor_num <= DungeonPortalConstants.MAX_FLOORS)
 	go_to("res://scenes/dungeon/floor_%02d.tscn" % floor_num)
 
 ## Экран смерти (показывает UI, затем возвращает в город).

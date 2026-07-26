@@ -6,16 +6,8 @@
 extends Node
 class_name AbilityManager
 
-## Маппинг Input Action → индекс слота эссенции.
-## Добавь ability_1..ability_4 в Project Settings → Input Map (клавиши Q/E/R/F).
-const DEFAULT_BINDINGS: Dictionary = {
-	"ability_1": 0,
-	"ability_2": 1,
-	"ability_3": 2,
-	"ability_4": 3,
-}
 
-var bindings: Dictionary = DEFAULT_BINDINGS.duplicate()
+var bindings: Dictionary = AbilityManagerConstants.DEFAULT_BINDINGS.duplicate()
 
 ## Словарь: slot_index (int) → AbilityBase.
 var _active_abilities: Dictionary = {}

@@ -11,41 +11,6 @@ class_name ControlsSettings
 
 signal closed
 
-## Действия передвижения — рабочие только в режиме клавиатуры (в режиме мыши бег по ПКМ).
-const MOVEMENT_ACTIONS: Array = ["move_up", "move_down", "move_left", "move_right"]
-## Прочие привязываемые действия — общие для обоих режимов бега.
-const COMMON_ACTIONS: Array = [
-	"dodge", "interact",
-	"ability_1", "ability_2", "ability_3", "ability_4",
-	"consumable_1", "consumable_2", "consumable_3", "consumable_4",
-	"inventory", "states", "party_command",
-]
-
-const ACTION_LABELS := {
-	"move_up": "Движение вверх",
-	"move_down": "Движение вниз",
-	"move_left": "Движение влево",
-	"move_right": "Движение вправо",
-	"dodge": "Уклонение",
-	"interact": "Взаимодействие",
-	"ability_1": "Способность 1",
-	"ability_2": "Способность 2",
-	"ability_3": "Способность 3",
-	"ability_4": "Способность 4",
-	"consumable_1": "Расходник 1",
-	"consumable_2": "Расходник 2",
-	"consumable_3": "Расходник 3",
-	"consumable_4": "Расходник 4",
-	"inventory": "Инвентарь",
-	"states": "Состояния",
-	"party_command": "Команда отряду (формация)",
-}
-
-## Действия, сознательно НЕ показываемые здесь — привязаны к мыши (attack/block) или это
-## служебный "pause" (Esc), который не переназначается. Любое другое действие из InputMap,
-## которого нет ни здесь, ни в MOVEMENT_ACTIONS/COMMON_ACTIONS, считается забытым — см.
-## _warn_about_unlisted_actions().
-const EXCLUDED_ACTIONS: Array = ["attack", "block", "pause"]
 
 @onready var _mode_switch: CheckButton = $Panel/Margin/VBoxContainer/ModeRow/ModeSwitch
 @onready var _mode_value: Label = $Panel/Margin/VBoxContainer/ModeRow/ModeValueLabel
@@ -94,7 +59,7 @@ func open() -> void:
 	show()
 
 func _all_actions() -> Array:
-	return MOVEMENT_ACTIONS + COMMON_ACTIONS
+	return ControlsSettingsConstants.MOVEMENT_ACTIONS + ControlsSettingsConstants.COMMON_ACTIONS
 
 ## Предохранитель от забытых клавиш: любое собственное действие проекта (не встроенное
 ## "ui_*" из Godot), которого нет ни в списке экрана настроек, ни в EXCLUDED_ACTIONS,
@@ -105,7 +70,7 @@ func _warn_about_unlisted_actions() -> void:
 	var known := {}
 	for action in _all_actions():
 		known[action] = true
-	for action in EXCLUDED_ACTIONS:
+	for action in ControlsSettingsConstants.EXCLUDED_ACTIONS:
 		known[action] = true
 	for action in InputMap.get_actions():
 		var action_name := str(action)
@@ -117,7 +82,7 @@ func _warn_about_unlisted_actions() -> void:
 ## Действия, показываемые/редактируемые в текущем режиме бега.
 func _visible_actions() -> Array:
 	if _mode_draft == InputSettings.MovementMode.MOUSE:
-		return COMMON_ACTIONS.duplicate()
+		return ControlsSettingsConstants.COMMON_ACTIONS.duplicate()
 	return _all_actions()
 
 func _on_mode_toggled(pressed: bool) -> void:
@@ -149,7 +114,7 @@ func _make_row(action: String) -> HBoxContainer:
 	row.add_theme_constant_override("separation", 12)
 
 	var label := Label.new()
-	label.text = ACTION_LABELS.get(action, action)
+	label.text = ControlsSettingsConstants.ACTION_LABELS.get(action, action)
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(label)
 
@@ -176,7 +141,7 @@ func _refresh_all_buttons() -> void:
 
 func _begin_capture(action: String) -> void:
 	_capturing = action
-	_capture_hint.text = "Нажмите клавишу для «%s»  (Esc — отмена)" % ACTION_LABELS.get(action, action)
+	_capture_hint.text = "Нажмите клавишу для «%s»  (Esc — отмена)" % ControlsSettingsConstants.ACTION_LABELS.get(action, action)
 	_refresh_all_buttons()
 
 func _cancel_capture() -> void:

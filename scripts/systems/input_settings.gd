@@ -7,7 +7,6 @@
 ## в черновике UI и на игру не влияют.
 extends Node
 
-const SETTINGS_PATH := "user://settings.cfg"
 
 ## Способ передвижения персонажа. KEYBOARD — WASD/стрелки, MOUSE — бег к точке по ПКМ.
 enum MovementMode { KEYBOARD, MOUSE }
@@ -26,7 +25,7 @@ func _ready() -> void:
 ## значения по умолчанию из project.godot.
 func load_settings() -> void:
 	var cfg := ConfigFile.new()
-	if cfg.load(SETTINGS_PATH) != OK:
+	if cfg.load(InputSettingsConstants.SETTINGS_PATH) != OK:
 		movement_mode = MovementMode.KEYBOARD
 		return
 	movement_mode = int(cfg.get_value("controls", "movement_mode", 0)) as MovementMode
@@ -89,4 +88,4 @@ func _save_to_disk(bindings: Dictionary) -> void:
 	cfg.set_value("controls", "movement_mode", int(movement_mode))
 	for action in bindings:
 		cfg.set_value("keybinds", str(action), int(bindings[action]))
-	cfg.save(SETTINGS_PATH)
+	cfg.save(InputSettingsConstants.SETTINGS_PATH)

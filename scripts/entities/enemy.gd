@@ -9,24 +9,13 @@ class_name Enemy
 var health: int
 var _modifiers: Array[StatModifier] = []
 
-const GRAVITY: float = -20.0
-## Раз в это время (сек) применяется пассивная регенерация HP (стат "regen").
-const REGEN_TICK_INTERVAL: float = 1.0
+
 var _regen_timer: float = 0.0
 ## Оставшийся кулдаун самолечения (data.self_heal_consumable), сек.
 var _self_heal_cooldown: float = 0.0
-## Раз в это время (сек) переоценивается ближайшая вражеская по фракции цель
-## и место (угол) этого врага в кольце окружения цели.
-const RETARGET_INTERVAL: float = 0.5
+
 var _retarget_timer: float = 0.0
 
-# --- Групповая тактика ---
-## Радиус, в котором враги отталкиваются друг от друга, чтобы не сливаться в кучу.
-const SEPARATION_RADIUS: float = 1.4
-## Вес separation-вектора относительно направления к цели.
-const SEPARATION_WEIGHT: float = 0.7
-## Доля attack_range, на которой строится кольцо точек окружения вокруг цели.
-const SURROUND_RING_SCALE: float = 0.8
 
 ## Угол этого врага в кольце окружения цели. Назначается детерминированно:
 ## все враги с той же целью сортируются по instance_id, ранг задаёт угол.
@@ -72,7 +61,7 @@ func _ready() -> void:
 	# Форсируем поиск цели на первом же _physics_process — не нужно ждать кадр
 	# и проверять is_inside_tree(): периодический тик сам подхватит игрока,
 	# как только тот появится в группе "combatants".
-	_retarget_timer = RETARGET_INTERVAL
+	_retarget_timer = EnemyConstants.RETARGET_INTERVAL
 
 ## Создаёт полоску HP над головой и подписывает её на изменения здоровья.
 func _setup_health_bar() -> void:
@@ -94,7 +83,7 @@ func _physics_process(delta: float) -> void:
 	if state == State.DEAD:
 		return
 	if not is_on_floor():
-		velocity.y += GRAVITY * delta
+		velocity.y += EnemyConstants.GRAVITY * delta
 	_attack_cooldown = max(0.0, _attack_cooldown - delta)
 	_tick_passive_regen(delta)
 	_tick_self_heal(delta)
@@ -120,7 +109,7 @@ func _update_facing() -> void:
 ## поиск при спавне — самовосстанавливается, если цель умерла или ещё не заспавнилась.
 func _tick_retarget(delta: float) -> void:
 	_retarget_timer += delta
-	if _retarget_timer < RETARGET_INTERVAL:
+	if _retarget_timer < EnemyConstants.RETARGET_INTERVAL:
 		return
 	_retarget_timer = 0.0
 	_retarget()
@@ -169,7 +158,7 @@ func _update_surround_angle() -> void:
 
 ## Точка на кольце вокруг цели, куда этот враг стремится при погоне.
 func _surround_point() -> Vector3:
-	var ring_radius: float = maxf(get_stat("attack_range") * SURROUND_RING_SCALE, 0.6)
+	var ring_radius: float = maxf(get_stat("attack_range") * EnemyConstants.SURROUND_RING_SCALE, 0.6)
 	var offset := Vector3(cos(_surround_angle), 0.0, sin(_surround_angle)) * ring_radius
 	return _target.global_position + offset
 
@@ -203,9 +192,9 @@ func _separation_vector() -> Vector3:
 		var away: Vector3 = global_position - other.global_position
 		away.y = 0.0
 		var dist: float = away.length()
-		if dist < 0.001 or dist > SEPARATION_RADIUS:
+		if dist < 0.001 or dist > EnemyConstants.SEPARATION_RADIUS:
 			continue
-		push += (away / dist) * (1.0 - dist / SEPARATION_RADIUS)
+		push += (away / dist) * (1.0 - dist / EnemyConstants.SEPARATION_RADIUS)
 	return push
 
 # ─── Стат-система ──────────────────────────────────────────────────────────
@@ -285,8 +274,8 @@ func take_damage(amount: int, is_crit: bool = false) -> void:
 ## Итоговый шанс крита атак этого врага (база data.crit_chance + модификаторы "crit_chance").
 func get_attack_crit_chance() -> float:
 	if data == null:
-		return CombatMath.BASE_CRIT_CHANCE
-	return clampf(get_stat("crit_chance"), 0.0, CombatMath.MAX_CRIT_CHANCE)
+		return CombatMathConstants.BASE_CRIT_CHANCE
+	return clampf(get_stat("crit_chance"), 0.0, CombatMathConstants.MAX_CRIT_CHANCE)
 
 ## Прибавка к шансу крита атакующего от ослаблений на этом враге (модификаторы
 ## "crit_vulnerability", доля 0.0–1.0). Так дебаффы делают врага уязвимее к криту.
@@ -324,7 +313,7 @@ func _tick_passive_regen(delta: float) -> void:
 	if state == State.DEAD:
 		return
 	_regen_timer += delta
-	if _regen_timer < REGEN_TICK_INTERVAL:
+	if _regen_timer < EnemyConstants.REGEN_TICK_INTERVAL:
 		return
 	_regen_timer = 0.0
 	var regen: int = get_stat_int("regen")
@@ -381,7 +370,7 @@ func _tick_chase(_delta: float) -> void:
 		return
 	# Направление к своей точке окружения + отталкивание от соседей,
 	# чтобы группа рассредоточивалась вокруг цели, а не сливалась в колонну.
-	var dir: Vector3 = _chase_direction() + _separation_vector() * SEPARATION_WEIGHT
+	var dir: Vector3 = _chase_direction() + _separation_vector() * EnemyConstants.SEPARATION_WEIGHT
 	dir.y = 0.0
 	if dir.length_squared() > 0.001:
 		dir = dir.normalized()

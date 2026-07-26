@@ -6,8 +6,6 @@
 extends Node
 class_name EnemyAbilityController
 
-## Пауза между попытками каста (сек), чтобы не перебирать способности каждый кадр.
-const CAST_ATTEMPT_INTERVAL: float = 0.5
 
 var _enemy: Enemy = null
 var _abilities: Array[AbilityBase] = []
@@ -38,7 +36,7 @@ func _physics_process(delta: float) -> void:
 	_attempt_timer -= delta
 	if _attempt_timer > 0.0:
 		return
-	_attempt_timer = CAST_ATTEMPT_INTERVAL
+	_attempt_timer = EnemyAbilityControllerConstants.CAST_ATTEMPT_INTERVAL
 	if not _is_in_combat():
 		return
 	for ability in _abilities:

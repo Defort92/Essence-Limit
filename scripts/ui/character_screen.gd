@@ -5,20 +5,6 @@
 ## Открывается/закрывается клавишей "inventory" (I). Каркас модалки — в UIModalScreen.
 extends UIModalScreen
 
-const SLOT_NAMES := {
-	EquipmentData.Slot.HEAD: "Голова",
-	EquipmentData.Slot.BODY: "Тело",
-	EquipmentData.Slot.LEGS: "Ноги",
-	EquipmentData.Slot.GLOVES: "Перчатки",
-	EquipmentData.Slot.WEAPON_MAIN: "Оружие",
-	EquipmentData.Slot.WEAPON_OFF: "Вторая рука",
-}
-## Порядок отображения основных слотов экипировки (аксессуары показываются отдельно).
-const ARMOR_SLOTS := [
-	EquipmentData.Slot.HEAD, EquipmentData.Slot.BODY,
-	EquipmentData.Slot.LEGS, EquipmentData.Slot.GLOVES,
-	EquipmentData.Slot.WEAPON_MAIN, EquipmentData.Slot.WEAPON_OFF,
-]
 
 @onready var _member_tabs: HBoxContainer = $Dim/CenterContainer/Panel/Margin/VBoxContainer/MemberTabsRow
 @onready var _equipment_list: VBoxContainer = $Dim/CenterContainer/Panel/Margin/VBoxContainer/ColumnsRow/EquipmentColumn/ScrollContainer/EquipmentList
@@ -98,9 +84,9 @@ func _rebuild_equipment_list() -> void:
 		child.queue_free()
 
 	var target_equipment: EquipmentManager = _target_member.equipment
-	for slot: EquipmentData.Slot in ARMOR_SLOTS:
+	for slot: EquipmentData.Slot in CharacterScreenConstants.ARMOR_SLOTS:
 		var item: EquipmentData = target_equipment.get_equipped(slot)
-		var label_name: String = SLOT_NAMES.get(slot, "?")
+		var label_name: String = CharacterScreenConstants.SLOT_NAMES.get(slot, "?")
 		if item == null:
 			_equipment_list.add_child(UIListRow.create("%s: пусто" % label_name))
 			continue
@@ -130,7 +116,7 @@ func _rebuild_equipment_list() -> void:
 				"Аксессуар: %s" % item.display_name,
 				[{"text": "Снять", "callback": func() -> void: target_equipment.unequip_accessory(idx)}]
 			))
-	for _idx in (EquipmentManager.MAX_ACCESSORIES - accessories.size()):
+	for _idx in (EquipmentManagerConstants.MAX_ACCESSORIES - accessories.size()):
 		_equipment_list.add_child(UIListRow.create("Аксессуар: пусто"))
 
 # ─── Рюкзак (общий на весь отряд) ───────────────────────────────────────────

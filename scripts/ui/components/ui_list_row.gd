@@ -6,8 +6,6 @@
 extends HBoxContainer
 class_name UIListRow
 
-const TEXT_COLOR := Color(0.78, 0.71, 0.6, 1)
-const TEXT_HOVER_COLOR := Color(0.95, 0.83, 0.45, 1)
 
 static var _style_normal: StyleBoxFlat = null
 static var _style_hover: StyleBoxFlat = null
@@ -21,7 +19,7 @@ static func create(label_text: String, actions: Array = []) -> UIListRow:
 	var label := Label.new()
 	label.text = label_text
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	label.add_theme_color_override("font_color", TEXT_COLOR)
+	label.add_theme_color_override("font_color", UIListRowConstants.TEXT_COLOR)
 	row.add_child(label)
 
 	for action: Dictionary in actions:
@@ -36,8 +34,8 @@ static func make_button(text_value: String, callback: Callable, highlighted: boo
 	button.text = text_value
 	button.add_theme_stylebox_override("normal", _style_hover if highlighted else _style_normal)
 	button.add_theme_stylebox_override("hover", _style_hover)
-	button.add_theme_color_override("font_color", TEXT_COLOR)
-	button.add_theme_color_override("font_hover_color", TEXT_HOVER_COLOR)
+	button.add_theme_color_override("font_color", UIListRowConstants.TEXT_COLOR)
+	button.add_theme_color_override("font_hover_color", UIListRowConstants.TEXT_HOVER_COLOR)
 	button.pressed.connect(callback)
 	return button
 

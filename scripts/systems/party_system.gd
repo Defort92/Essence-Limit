@@ -9,16 +9,6 @@
 ## Является Autoload-синглтоном; регистрировать как "PartySystem" в Project Settings.
 extends Node
 
-const MAX_PARTY_SIZE: int = 5
-## Сколько секунд новый активный участник неуязвим после переключения — защита от
-## мгновенной смерти, если управление передали посреди боя.
-const SWITCH_INVULNERABILITY_DURATION: float = 1.2
-## На сколько падает доверие каждого наёмника, когда участник отряда погибает.
-const TRUST_LOSS_ON_MEMBER_DEATH: int = 15
-## Шанс предательства (иначе побег) при падении доверия до нуля.
-const BETRAYAL_CHANCE: float = 0.5
-
-const COMPANION_SCENE_PATH := "res://scenes/characters/player.tscn"
 
 ## Персистентные данные участников. Ключи записи:
 ## race:int, name:String, trust:int, role:int (CompanionData.Role),
@@ -53,8 +43,8 @@ signal formation_mode_changed(mode: FormationMode)
 func register_member(member: Player) -> void:
 	if members.has(member):
 		return
-	if members.size() >= MAX_PARTY_SIZE:
-		push_warning("PartySystem: отряд уже полон (%d/%d), '%s' не добавлен" % [members.size(), MAX_PARTY_SIZE, member.name])
+	if members.size() >= PartySystemConstants.MAX_PARTY_SIZE:
+		push_warning("PartySystem: отряд уже полон (%d/%d), '%s' не добавлен" % [members.size(), PartySystemConstants.MAX_PARTY_SIZE, member.name])
 		return
 	if member.roster_index == -1:
 		if roster.is_empty():
@@ -82,7 +72,7 @@ func _spawn_missing_companions(hero: Player) -> void:
 		_spawn_companion(idx, hero)
 
 func _spawn_companion(roster_idx: int, near: Player) -> void:
-	var packed := load(COMPANION_SCENE_PATH) as PackedScene
+	var packed := load(PartySystemConstants.COMPANION_SCENE_PATH) as PackedScene
 	var companion := packed.instantiate() as Player
 	companion.roster_index = roster_idx
 	near.get_parent().add_child(companion)
@@ -99,7 +89,7 @@ func _find_member_by_roster_index(roster_idx: int) -> Player:
 ## Нанимает наёмника [param data] за золото. Спавнит его рядом с активным участником.
 ## Возвращает [code]false[/code] если отряд полон или не хватает золота.
 func recruit(data: CompanionData) -> bool:
-	if roster.size() >= MAX_PARTY_SIZE or get_active_member() == null:
+	if roster.size() >= PartySystemConstants.MAX_PARTY_SIZE or get_active_member() == null:
 		return false
 	if not GameManager.spend_gold(data.hire_cost):
 		return false
@@ -109,7 +99,7 @@ func recruit(data: CompanionData) -> bool:
 ## скриптовые события). Спавнит его рядом с активным участником.
 ## Возвращает [code]false[/code] если отряд полон или в сцене нет активного участника.
 func add_companion(data: CompanionData) -> bool:
-	if roster.size() >= MAX_PARTY_SIZE:
+	if roster.size() >= PartySystemConstants.MAX_PARTY_SIZE:
 		return false
 	var leader := get_active_member()
 	if leader == null:
@@ -174,7 +164,7 @@ func switch_active(index: int) -> void:
 	if old_member != null:
 		old_member.set_control_mode(Player.ControlMode.AI)
 	new_member.set_control_mode(Player.ControlMode.HUMAN)
-	new_member.grant_switch_invulnerability(SWITCH_INVULNERABILITY_DURATION)
+	new_member.grant_switch_invulnerability(PartySystemConstants.SWITCH_INVULNERABILITY_DURATION)
 	active_index = index
 	active_member_changed.emit(old_member, new_member)
 
@@ -186,7 +176,7 @@ func switch_active(index: int) -> void:
 func on_trust_bottomed(member: Player) -> void:
 	if member.roster_index <= 0 or not members.has(member):
 		return
-	var betrayed: bool = randf() < BETRAYAL_CHANCE
+	var betrayed: bool = randf() < PartySystemConstants.BETRAYAL_CHANCE
 	_remove_from_party(member)
 	if betrayed:
 		member.turn_traitor()
@@ -222,7 +212,7 @@ func _on_member_died(member: Player) -> void:
 	# Гибель товарища бьёт по доверию оставшихся наёмников.
 	for other in members:
 		if other != member and other.state != Player.State.DEAD and other.roster_index > 0:
-			other.modify_trust(-TRUST_LOSS_ON_MEMBER_DEATH)
+			other.modify_trust(-PartySystemConstants.TRUST_LOSS_ON_MEMBER_DEATH)
 	if get_active_member() != member:
 		return
 	_switch_to_next_alive()

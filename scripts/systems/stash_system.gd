@@ -3,7 +3,6 @@
 ## Является Autoload-синглтоном; регистрировать как "StashSystem" в Project Settings.
 extends Node
 
-const MAX_SLOTS: int = 100
 
 var _slots: Array = []
 
@@ -30,7 +29,7 @@ func add_item(item: ItemData, quantity: int = 1) -> bool:
 					return true
 
 	while quantity > 0:
-		if _slots.size() >= MAX_SLOTS:
+		if _slots.size() >= StashSystemConstants.MAX_SLOTS:
 			if any_added:
 				stash_changed.emit()
 			return false
@@ -82,7 +81,7 @@ func get_slots() -> Array:
 
 ## Возвращает [code]true[/code] если хранилище заполнено.
 func is_full() -> bool:
-	return _slots.size() >= MAX_SLOTS
+	return _slots.size() >= StashSystemConstants.MAX_SLOTS
 
 ## Перемещает [param quantity] единиц предмета из рюкзака активного персонажа в хранилище.
 ## Вызывать только когда player.is_in_town == true.
