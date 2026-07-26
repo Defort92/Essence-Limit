@@ -17,21 +17,125 @@
 [ext_resource type="Resource" path="res://resources/companions/mercenary_healer.tres" id="14"]
 [ext_resource type="Resource" path="res://resources/companions/mercenary_fighter.tres" id="15"]
 [ext_resource type="PackedScene" path="res://scenes/world/scene_portal.tscn" id="16"]
+[ext_resource type="Shader" path="res://assets/shaders/main_terrain.gdshader" id="18_terrain_shader"]
+[ext_resource type="Texture2D" path="res://assets/textures/environment/ground/dual_grid/ground_soil_01.png" id="19_soil_01"]
+[ext_resource type="Texture2D" path="res://assets/textures/environment/ground/dual_grid/ground_soil_02.png" id="20_soil_02"]
+[ext_resource type="Texture2D" path="res://assets/textures/environment/ground/dual_grid/main_terrain_grass_mask.png" id="21_grass_mask"]
+[ext_resource type="Texture2D" path="res://assets/textures/environment/ground/dual_grid/ground_grass_01.png" id="22_ground_grass_01"]
+[ext_resource type="Texture2D" path="res://assets/textures/environment/ground/dual_grid/ground_grass_02.png" id="23_ground_grass_02"]
+[ext_resource type="Script" uid="uid://doo3dpglgdiiq" path="res://scripts/effects/grass_multimesh_chunk.gd" id="24_grass_chunk"]
+[ext_resource type="Shader" uid="uid://bwlm5br2cecmd" path="res://assets/shaders/dylearn/Grass.gdshader" id="25_grass_shader"]
+[ext_resource type="Texture2D" uid="uid://b40kn8me8ssry" path="res://assets/textures/environment/grass_dylearn.png" id="26_grass_blade"]
+[ext_resource type="Texture2D" uid="uid://b6fhxncxd7b1t" path="res://assets/textures/environment/dylearn/WindNoise.tres" id="27_wind_noise"]
+[ext_resource type="Texture2D" uid="uid://vqml4pj02ucs" path="res://assets/textures/environment/dylearn/Albedo2Noise.tres" id="28_albedo_2_noise"]
+[ext_resource type="Texture2D" uid="uid://c52v6tkx73uro" path="res://assets/textures/environment/dylearn/Albedo3Noise.tres" id="29_albedo_3_noise"]
+[ext_resource type="Texture2D" uid="uid://cnyu71qx10i0e" path="res://assets/textures/environment/dylearn/accentleaf.png" id="30_accent_leaf"]
+[ext_resource type="Script" uid="uid://du1bomy5amqmr" path="res://scripts/effects/dylearn/ShaderGlobals.gd" id="31_shader_globals"]
+[ext_resource type="Script" uid="uid://6i7mxyjfcni2" path="res://scripts/effects/dylearn/LightDirection.gd" id="32_light_direction"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_1"]
 size = Vector3(60, 1, 60)
 
-[sub_resource type="BoxMesh" id="BoxMesh_1"]
-size = Vector3(60, 1, 60)
+[sub_resource type="PlaneMesh" id="GroundPlaneMesh"]
+size = Vector2(60, 60)
 
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_1"]
-albedo_color = Color(0.25, 0.22, 0.18, 1)
+[sub_resource type="ShaderMaterial" id="MainTerrainMaterial"]
+shader = ExtResource("18_terrain_shader")
+shader_parameter/soil_texture_01 = ExtResource("19_soil_01")
+shader_parameter/soil_texture_02 = ExtResource("20_soil_02")
+shader_parameter/grass_texture_01 = ExtResource("22_ground_grass_01")
+shader_parameter/grass_texture_02 = ExtResource("23_ground_grass_02")
+shader_parameter/grass_patch_noise_02 = ExtResource("28_albedo_2_noise")
+shader_parameter/grass_patch_noise_03 = ExtResource("29_albedo_3_noise")
+shader_parameter/grass_coverage_mask = ExtResource("21_grass_mask")
+shader_parameter/terrain_origin = Vector2(-30, -30)
+shader_parameter/terrain_size = Vector2(60, 60)
+shader_parameter/soil_texture_world_size = 2.0
+shader_parameter/grass_texture_world_size = 2.0
+shader_parameter/soil_tint = Color(1, 1, 1, 1)
+shader_parameter/grass_tint = Color(1, 1.08, 0.9, 1)
+shader_parameter/terrain_filter_color = Color(1, 1, 1, 1)
+shader_parameter/terrain_filter_strength = 0.0
+shader_parameter/cloud_shadow_strength = 0.5
+shader_parameter/grass_patch_02_tint = Color(1.15, 1.08, 0.92, 1)
+shader_parameter/grass_patch_03_tint = Color(0.76, 0.94, 0.72, 1)
+shader_parameter/grass_patch_02_scale = 0.11
+shader_parameter/grass_patch_03_scale = 0.1
+shader_parameter/grass_patch_02_threshold = 0.537
+shader_parameter/grass_patch_03_threshold = 0.471
+shader_parameter/grass_patch_softness = 0.055
+
+[sub_resource type="ShaderMaterial" id="MainGrassMaterial"]
+render_priority = 0
+shader = ExtResource("25_grass_shader")
+shader_parameter/albedo_texture = ExtResource("26_grass_blade")
+shader_parameter/albedo1 = Color(0.443137, 0.635294, 0, 1)
+shader_parameter/grass_filter_color = Color(1, 1, 1, 1)
+shader_parameter/grass_filter_strength = 0.0
+shader_parameter/albedo2 = Color(0.556863, 0.678431, 0.211765, 1)
+shader_parameter/albedo2_scale = 0.11
+shader_parameter/albedo2_threshold = 0.537
+shader_parameter/albedo2_noise = ExtResource("28_albedo_2_noise")
+shader_parameter/albedo3 = Color(0.501961, 0.654902, 0.223529, 1)
+shader_parameter/albedo3_scale = 0.1
+shader_parameter/albedo3_threshold = 0.471
+shader_parameter/albedo3_noise = ExtResource("29_albedo_3_noise")
+shader_parameter/accent_frequency1 = 0.001
+shader_parameter/accent_texture1 = ExtResource("26_grass_blade")
+shader_parameter/accent_albedo1 = Color(0.603922, 0.717647, 0, 1)
+shader_parameter/accent_height1 = 0.1
+shader_parameter/accent_scale1 = 1.0
+shader_parameter/accent_probability2 = 0.0001
+shader_parameter/accent_texture2 = ExtResource("30_accent_leaf")
+shader_parameter/accent_albedo2 = Color(0.423529, 0.603922, 0, 1)
+shader_parameter/accent_height2 = 0.185
+shader_parameter/accent_scale2 = 1.0
+shader_parameter/framerate = 5.0
+shader_parameter/quantised = true
+shader_parameter/world_space_sway = true
+shader_parameter/debug_noise = false
+shader_parameter/world_sway_angle = 60.0
+shader_parameter/fake_perspective_scale = 0.3
+shader_parameter/wind_noise = ExtResource("27_wind_noise")
+shader_parameter/wind_noise_threshold = 0.365
+shader_parameter/wind_noise_scale = 0.071
+shader_parameter/wind_noise_speed = 0.025
+shader_parameter/wind_noise_direction = Vector2(0, 1)
+shader_parameter/noise_diverge_angle = 10.0
+shader_parameter/view_space_sway = true
+shader_parameter/view_sway_speed = 0.1
+shader_parameter/view_sway_angle = 10.0
+shader_parameter/character_displacement = true
+shader_parameter/debug_displacement = false
+shader_parameter/player_displacement_angle_z = 60.0
+shader_parameter/player_displacement_angle_x = 62.7
+shader_parameter/radius_exponent = 0.9
+shader_parameter/character_positions = Array[Vector4]([Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0), Vector4(0, 0, 0, 0)])
+shader_parameter/cuts = 3
+shader_parameter/wrap = 0.0
+shader_parameter/steepness = 1.0
+shader_parameter/threshold_gradient_size = 0.255
+
+[sub_resource type="QuadMesh" id="MainGrassBladeMesh"]
+size = Vector2(0.2, 0.3)
+center_offset = Vector3(0, 0.15, 0)
 
 [sub_resource type="NavigationMesh" id="NavigationMesh_1"]
 vertices = PackedVector3Array(-30, 0, -30, 30, 0, -30, 30, 0, 30, -30, 0, 30)
 polygons = [PackedInt32Array(0, 1, 2, 3)]
 
 [node name="Main" type="Node3D" unique_id=1014595042]
+
+[node name="ShaderGlobals" type="Node" parent="."]
+script = ExtResource("31_shader_globals")
+cloud_contrast = 2.2
+cloud_direction = Vector2(0, -1)
+cloud_diverge_angle = 20.0
+cloud_scale = 40.0
+cloud_speed = -0.01
+cloud_threshold = 0.27
+cloud_shadow_min = 0.55
+cloud_world_y = 50.0
 
 [node name="NavigationRegion3D" type="NavigationRegion3D" parent="."]
 navigation_mesh = SubResource("NavigationMesh_1")
@@ -40,6 +144,7 @@ navigation_mesh = SubResource("NavigationMesh_1")
 transform = Transform3D(1, 0, 0, 0, 0.707107, 0.707107, 0, -0.707107, 0.707107, 0, 15, 5)
 light_energy = 1.2
 shadow_enabled = true
+script = ExtResource("32_light_direction")
 
 [node name="Camera3D" type="Camera3D" parent="." unique_id=871679916]
 transform = Transform3D(1, 0, 0, 0, 0.5, -0.866025, 0, 0.866025, 0.5, 0, 18, 11)
@@ -52,8 +157,91 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
 shape = SubResource("BoxShape3D_1")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Floor" unique_id=2134496099]
-mesh = SubResource("BoxMesh_1")
-surface_material_override/0 = SubResource("StandardMaterial3D_1")
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.5, 0)
+mesh = SubResource("GroundPlaneMesh")
+surface_material_override/0 = SubResource("MainTerrainMaterial")
+
+[node name="VegetationChunks" type="Node3D" parent="."]
+
+[node name="GrassNorthWest" type="MultiMeshInstance3D" parent="VegetationChunks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.02, -15)
+material_override = SubResource("MainGrassMaterial")
+cast_shadow = 0
+visibility_range_end = 0.0
+script = ExtResource("24_grass_chunk")
+blade_mesh = SubResource("MainGrassBladeMesh")
+area_size = Vector2(30, 30)
+density_per_square_meter = 38.0
+maximum_instances = 35000
+random_seed = 8042
+coverage_texture = ExtResource("21_grass_mask")
+coverage_world_origin = Vector2(-30, -30)
+coverage_world_size = Vector2(60, 60)
+coverage_threshold = 0.72
+path_clear_half_width = 0.0
+exclusion_rect = Rect2(0, 0, 0, 0)
+interactor_path = NodePath("../../Player")
+interactor_group = &"party"
+
+[node name="GrassNorthEast" type="MultiMeshInstance3D" parent="VegetationChunks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.02, -15)
+material_override = SubResource("MainGrassMaterial")
+cast_shadow = 0
+visibility_range_end = 0.0
+script = ExtResource("24_grass_chunk")
+blade_mesh = SubResource("MainGrassBladeMesh")
+area_size = Vector2(30, 30)
+density_per_square_meter = 38.0
+maximum_instances = 35000
+random_seed = 8143
+coverage_texture = ExtResource("21_grass_mask")
+coverage_world_origin = Vector2(-30, -30)
+coverage_world_size = Vector2(60, 60)
+coverage_threshold = 0.72
+path_clear_half_width = 0.0
+exclusion_rect = Rect2(0, 0, 0, 0)
+interactor_path = NodePath("../../Player")
+interactor_group = &"party"
+
+[node name="GrassSouthWest" type="MultiMeshInstance3D" parent="VegetationChunks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -15, 0.02, 15)
+material_override = SubResource("MainGrassMaterial")
+cast_shadow = 0
+visibility_range_end = 0.0
+script = ExtResource("24_grass_chunk")
+blade_mesh = SubResource("MainGrassBladeMesh")
+area_size = Vector2(30, 30)
+density_per_square_meter = 38.0
+maximum_instances = 35000
+random_seed = 8244
+coverage_texture = ExtResource("21_grass_mask")
+coverage_world_origin = Vector2(-30, -30)
+coverage_world_size = Vector2(60, 60)
+coverage_threshold = 0.72
+path_clear_half_width = 0.0
+exclusion_rect = Rect2(0, 0, 0, 0)
+interactor_path = NodePath("../../Player")
+interactor_group = &"party"
+
+[node name="GrassSouthEast" type="MultiMeshInstance3D" parent="VegetationChunks"]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 15, 0.02, 15)
+material_override = SubResource("MainGrassMaterial")
+cast_shadow = 0
+visibility_range_end = 0.0
+script = ExtResource("24_grass_chunk")
+blade_mesh = SubResource("MainGrassBladeMesh")
+area_size = Vector2(30, 30)
+density_per_square_meter = 38.0
+maximum_instances = 35000
+random_seed = 8345
+coverage_texture = ExtResource("21_grass_mask")
+coverage_world_origin = Vector2(-30, -30)
+coverage_world_size = Vector2(60, 60)
+coverage_threshold = 0.72
+path_clear_half_width = 0.0
+exclusion_rect = Rect2(0, 0, 0, 0)
+interactor_path = NodePath("../../Player")
+interactor_group = &"party"
 
 [node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8525088, 0)
