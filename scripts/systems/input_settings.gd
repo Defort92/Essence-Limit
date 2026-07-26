@@ -63,7 +63,7 @@ func action_key_label(action: String, fallback: String = "—") -> String:
 	return keycode_label(keycode)
 
 ## Человекочитаемое имя клавиши по её физическому keycode (для текущей раскладки).
-static func keycode_label(physical_keycode: int) -> String:
+func keycode_label(physical_keycode: int) -> String:
 	if physical_keycode == 0:
 		return "—"
 	var logical := DisplayServer.keyboard_get_keycode_from_physical(physical_keycode)
@@ -80,7 +80,7 @@ func _apply_binding(action: String, physical_keycode: int) -> void:
 		if ev is InputEventKey:
 			InputMap.action_erase_event(action, ev)
 	var key_event := InputEventKey.new()
-	key_event.physical_keycode = physical_keycode
+	key_event.physical_keycode = physical_keycode as Key
 	InputMap.action_add_event(action, key_event)
 
 func _save_to_disk(bindings: Dictionary) -> void:

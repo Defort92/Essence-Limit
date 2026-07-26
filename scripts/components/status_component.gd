@@ -141,5 +141,5 @@ static func format_remaining(remaining: float) -> String:
 		return ""
 	var secs: int = int(ceil(remaining))
 	if secs >= 60:
-		return "%d:%02d" % [secs / 60, secs % 60]
+		return "%d:%02d" % [int(float(secs) / 60.0), secs % 60]
 	return "%dс" % secs

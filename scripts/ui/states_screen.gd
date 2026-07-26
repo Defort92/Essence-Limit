@@ -6,7 +6,6 @@
 extends UIModalScreen
 
 
-@onready var _title_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox/TitleLabel
 @onready var _subtitle_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/TitleBox/SubtitleLabel
 @onready var _buffs_count_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/BuffsCountLabel
 @onready var _debuffs_count_label: Label = $CenterContainer/Panel/Margin/VBox/HeaderRow/DebuffsCountLabel

@@ -19,15 +19,15 @@ var _is_crit: bool = false
 static func spawn(host: Node, world_pos: Vector3, amount: int, kind: int) -> void:
 	if host == null or not host.is_inside_tree():
 		return
-	var text := FloatingCombatText.new()
-	text._configure(amount, kind)
+	var combat_text := FloatingCombatText.new()
+	combat_text._configure(amount, kind)
 	# Небольшой случайный сдвиг по X, чтобы серия чисел не наложилась в одну точку.
-	text._anchor = world_pos + Vector3(randf_range(-0.25, 0.25), 0.0, 0.0)
+	combat_text._anchor = world_pos + Vector3(randf_range(-0.25, 0.25), 0.0, 0.0)
 	var root: Node = host.get_tree().current_scene
 	if root == null:
 		root = host.get_tree().root
-	root.add_child(text)
-	text.global_position = text._anchor
+	root.add_child(combat_text)
+	combat_text.global_position = combat_text._anchor
 
 func _configure(amount: int, kind: int) -> void:
 	text = str(amount)

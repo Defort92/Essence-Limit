@@ -142,7 +142,7 @@ func cycle_formation_mode() -> void:
 	formation_mode_changed.emit(formation_mode)
 
 ## Человекочитаемое имя режима формации (для HUD).
-static func formation_mode_name(mode: FormationMode) -> String:
+func formation_mode_name(mode: FormationMode) -> String:
 	match mode:
 		FormationMode.GATHER: return "Ко мне"
 		FormationMode.HOLD: return "Стоять"
@@ -258,7 +258,10 @@ func _store_member_state(member: Player) -> void:
 	entry["essence_bonus_slots"] = member.essence.bonus_slots
 	var essence_paths := []
 	for slot_essence in member.essence.slots:
-		essence_paths.append(slot_essence.resource_path if slot_essence != null else null)
+		if slot_essence != null:
+			essence_paths.append(slot_essence.resource_path)
+		else:
+			essence_paths.append(null)
 	entry["essences"] = essence_paths
 
 ## Возвращает запись roster для [param roster_idx], или пустой словарь если индекс вне диапазона.

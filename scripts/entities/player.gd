@@ -390,8 +390,11 @@ func _get_attack_damage() -> int:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null:
 		var weapon_damage: int = weapon.stat_bonuses.get("damage", 0)
-		return weapon_damage + get_total_stat("strength") / 2
-	return max(1, PlayerConstants.UNARMED_DAMAGE_BASE + get_total_stat("strength") / 3)
+		return weapon_damage + int(float(get_total_stat("strength")) / 2.0)
+	return maxi(
+		1,
+		PlayerConstants.UNARMED_DAMAGE_BASE + int(float(get_total_stat("strength")) / 3.0)
+	)
 
 func _get_attack_cooldown() -> float:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
@@ -757,7 +760,7 @@ func _ai_find_heal_target() -> Player:
 
 ## Сила одного исцеления лекаря: масштабируется интеллектом, как урон — силой.
 func _get_heal_power() -> int:
-	return PlayerConstants.AI_HEAL_BASE_AMOUNT + get_total_stat("intellect") / 2
+	return PlayerConstants.AI_HEAL_BASE_AMOUNT + int(float(get_total_stat("intellect")) / 2.0)
 
 ## true если в основной руке дальнобойное оружие — тогда ИИ держит дистанцию вместо сближения.
 func _ai_is_ranged_role() -> bool:

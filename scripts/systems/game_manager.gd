@@ -21,9 +21,9 @@ signal player_died()
 
 ## Сбрасывает все игровые системы и запускает новую игру с выбранной расой и именем.
 ## Вызывать из экрана создания персонажа перед сменой сцены.
-func new_game(race: Race, name: String) -> void:
+func new_game(race: Race, character_name: String) -> void:
 	player_race = race
-	player_name = name
+	player_name = character_name
 	gold_changed.emit(gold)
 
 	XPSystem.current_xp = 0
@@ -40,7 +40,7 @@ func new_game(race: Race, name: String) -> void:
 	RacialPassiveSystem.clear()
 	AchievementSystem.clear()
 
-	new_game_started.emit(race, name)
+	new_game_started.emit(race, character_name)
 
 ## Обрабатывает вайп отряда: закрывает портал, испускает сигнал и открывает экран смерти.
 ## Вызывается PartySystem, когда погибли все участники. HP восстановится через roster:

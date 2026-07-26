@@ -60,16 +60,26 @@ func _process(delta: float) -> void:
 			var interactor := candidate as Node3D
 			if interactor == null:
 				continue
-			var position := interactor.global_position
-			_character_positions[written] = Vector4(position.x, position.y, position.z, interactor_radius)
+			var interactor_position := interactor.global_position
+			_character_positions[written] = Vector4(
+				interactor_position.x,
+				interactor_position.y,
+				interactor_position.z,
+				interactor_radius
+			)
 			written += 1
 			if written >= _character_positions.size():
 				break
 	else:
 		var interactor := get_node_or_null(interactor_path) as Node3D
 		if interactor != null:
-			var position := interactor.global_position
-			_character_positions[0] = Vector4(position.x, position.y, position.z, interactor_radius)
+			var interactor_position := interactor.global_position
+			_character_positions[0] = Vector4(
+				interactor_position.x,
+				interactor_position.y,
+				interactor_position.z,
+				interactor_radius
+			)
 
 	grass_material.set_shader_parameter("character_positions", _character_positions)
 
@@ -147,8 +157,10 @@ func _rebuild() -> void:
 				continue
 
 			var uniform_scale := random.randf_range(minimum_scale, maximum_scale)
-			var basis := Basis.IDENTITY.scaled(Vector3(uniform_scale, uniform_scale, uniform_scale))
-			generated.set_instance_transform(written, Transform3D(basis, local_position))
+			var instance_basis := Basis.IDENTITY.scaled(
+				Vector3(uniform_scale, uniform_scale, uniform_scale)
+			)
+			generated.set_instance_transform(written, Transform3D(instance_basis, local_position))
 			written += 1
 
 	generated.visible_instance_count = written
@@ -158,14 +170,6 @@ func _rebuild() -> void:
 func _load_coverage_image() -> Image:
 	if coverage_texture == null:
 		return null
-
-	# Reading the source PNG first preserves its alpha channel even when Godot
-	# imported the Texture2D using a GPU-oriented compression mode.
-	var source_path := coverage_texture.resource_path
-	if not source_path.is_empty() and source_path.get_extension().to_lower() == "png":
-		var source_image := Image.load_from_file(source_path)
-		if source_image != null and not source_image.is_empty():
-			return source_image
 
 	return coverage_texture.get_image()
 
