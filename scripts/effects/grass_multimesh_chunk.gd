@@ -26,6 +26,9 @@ enum BuildMode {
 ## Optional world-space coverage map. Its alpha channel controls where blades
 ## may be generated, so paths and clearings use the same layout as the floor.
 @export var coverage_texture: Texture2D
+## Optional shared CPU image supplied by GrassChunkGrid so streamed chunks do
+## not download/read the same coverage texture on every rebuild.
+var coverage_image_override: Image
 @export var coverage_world_origin := Vector2(-30.0, -30.0)
 @export var coverage_world_size := Vector2(60.0, 60.0)
 @export_range(0.0, 1.0, 0.01) var coverage_threshold := 0.72
@@ -43,6 +46,18 @@ enum BuildMode {
 var _interaction_accumulator := 0.0
 var _character_positions: Array[Vector4] = []
 var _last_rebuild_benchmark: Dictionary = {}
+var _incremental_generated: MultiMesh
+var _incremental_coverage_image: Image
+var _incremental_random: RandomNumberGenerator
+var _incremental_started_us := 0
+var _incremental_population_us := 0
+var _incremental_columns := 0
+var _incremental_rows := 0
+var _incremental_capacity := 0
+var _incremental_candidate_index := 0
+var _incremental_written := 0
+var _incremental_cell_size := 0.0
+var _is_incremental_rebuild_active := false
 
 
 func _ready() -> void:
@@ -124,6 +139,86 @@ func get_rebuild_benchmark() -> Dictionary:
 	return _last_rebuild_benchmark.duplicate()
 
 
+func is_incremental_rebuild_active() -> bool:
+	return _is_incremental_rebuild_active
+
+
+## Prepares an empty MultiMesh and the immutable data needed for a budgeted
+## rebuild. Call continue_incremental_rebuild() on later frames until it returns
+## true. Godot resources stay on the main thread.
+func begin_incremental_rebuild() -> bool:
+	_begin_rebuild()
+	return not _is_incremental_rebuild_active
+
+
+## Processes at most candidate_budget placement candidates. Returns true when
+## the finished MultiMesh has been published.
+func continue_incremental_rebuild(candidate_budget: int) -> bool:
+	if not _is_incremental_rebuild_active:
+		return true
+
+	var population_started_us := Time.get_ticks_usec()
+	var processed := 0
+	var candidate_total := _incremental_columns * _incremental_rows
+	while (
+		processed < maxi(candidate_budget, 1)
+		and _incremental_candidate_index < candidate_total
+		and _incremental_written < _incremental_capacity
+	):
+		var candidate_index := _incremental_candidate_index
+		_incremental_candidate_index += 1
+		processed += 1
+
+		var row := candidate_index / _incremental_columns
+		var column := candidate_index % _incremental_columns
+		var base_x := (
+			(float(column) + 0.5) / float(_incremental_columns) * area_size.x
+			- area_size.x * 0.5
+		)
+		var base_z := (
+			(float(row) + 0.5) / float(_incremental_rows) * area_size.y
+			- area_size.y * 0.5
+		)
+		var jitter_x := (
+			_incremental_random.randf_range(-0.5, 0.5)
+			* _incremental_cell_size
+			* position_jitter
+		)
+		var jitter_z := (
+			_incremental_random.randf_range(-0.5, 0.5)
+			* _incremental_cell_size
+			* position_jitter
+		)
+		var local_position := Vector3(base_x + jitter_x, 0.02, base_z + jitter_z)
+
+		if absf(local_position.z) < path_clear_half_width:
+			continue
+		if exclusion_rect.has_point(Vector2(local_position.x, local_position.z)):
+			continue
+		if not _is_inside_coverage(local_position, _incremental_coverage_image):
+			continue
+
+		var uniform_scale := _incremental_random.randf_range(minimum_scale, maximum_scale)
+		var instance_basis := Basis.IDENTITY.scaled(
+			Vector3(uniform_scale, uniform_scale, uniform_scale)
+		)
+		_incremental_generated.set_instance_transform(
+			_incremental_written,
+			Transform3D(instance_basis, local_position)
+		)
+		_incremental_written += 1
+
+	_incremental_population_us += Time.get_ticks_usec() - population_started_us
+	if (
+		_incremental_candidate_index < candidate_total
+		and _incremental_written < _incremental_capacity
+	):
+		return false
+
+	_publish_incremental_rebuild()
+	return true
+
+
 func _capture_existing_multimesh() -> void:
 	_last_rebuild_benchmark = {
 		"action": "used existing",
@@ -138,7 +233,15 @@ func _capture_existing_multimesh() -> void:
 
 
 func _rebuild() -> void:
-	var rebuild_started_us := Time.get_ticks_usec()
+	_begin_rebuild()
+	while _is_incremental_rebuild_active:
+		continue_incremental_rebuild(1000000)
+
+
+func _begin_rebuild() -> void:
+	_incremental_started_us = Time.get_ticks_usec()
+	_incremental_population_us = 0
+	_is_incremental_rebuild_active = false
 	_last_rebuild_benchmark = {
 		"action": "generated",
 		"total_ms": 0.0,
@@ -150,88 +253,79 @@ func _rebuild() -> void:
 		"visible_count": 0,
 	}
 	if blade_mesh == null:
-		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(_incremental_started_us)
 		return
 	if is_zero_approx(density_per_square_meter):
 		multimesh = null
-		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(_incremental_started_us)
 		return
 
 	var coverage_started_us := Time.get_ticks_usec()
-	var coverage_image := _load_coverage_image()
+	_incremental_coverage_image = _load_coverage_image()
 	_last_rebuild_benchmark["coverage_image_ms"] = _elapsed_ms(coverage_started_us)
-	if coverage_texture != null and (coverage_image == null or coverage_image.is_empty()):
+	if (
+		coverage_texture != null
+		and (
+			_incremental_coverage_image == null
+			or _incremental_coverage_image.is_empty()
+		)
+	):
 		push_warning(
 			"Grass coverage texture could not be read; grass generation was disabled for %s." % name
 		)
 		multimesh = null
-		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(_incremental_started_us)
 		return
 
 	var target_count := mini(
 		maximum_instances,
 		roundi(area_size.x * area_size.y * density_per_square_meter)
 	)
-	var cell_size := sqrt((area_size.x * area_size.y) / float(target_count))
-	var columns := maxi(1, ceili(area_size.x / cell_size))
-	var rows := maxi(1, ceili(area_size.y / cell_size))
-	var capacity := mini(maximum_instances, columns * rows)
+	_incremental_cell_size = sqrt((area_size.x * area_size.y) / float(target_count))
+	_incremental_columns = maxi(1, ceili(area_size.x / _incremental_cell_size))
+	_incremental_rows = maxi(1, ceili(area_size.y / _incremental_cell_size))
+	_incremental_capacity = mini(
+		maximum_instances,
+		_incremental_columns * _incremental_rows
+	)
 
 	var allocation_started_us := Time.get_ticks_usec()
-	var generated := MultiMesh.new()
-	generated.transform_format = MultiMesh.TRANSFORM_3D
-	generated.mesh = blade_mesh
-	generated.instance_count = capacity
-	generated.visible_instance_count = 0
-	generated.custom_aabb = AABB(
+	_incremental_generated = MultiMesh.new()
+	_incremental_generated.transform_format = MultiMesh.TRANSFORM_3D
+	_incremental_generated.mesh = blade_mesh
+	_incremental_generated.instance_count = _incremental_capacity
+	_incremental_generated.visible_instance_count = 0
+	_incremental_generated.custom_aabb = AABB(
 		Vector3(-area_size.x * 0.5, -0.1, -area_size.y * 0.5),
 		Vector3(area_size.x, 1.2, area_size.y)
 	)
 	_last_rebuild_benchmark["allocation_ms"] = _elapsed_ms(allocation_started_us)
 
-	var random := RandomNumberGenerator.new()
-	random.seed = random_seed
-	var written := 0
-	var candidate_count := 0
-	var population_started_us := Time.get_ticks_usec()
+	_incremental_random = RandomNumberGenerator.new()
+	_incremental_random.seed = random_seed
+	_incremental_candidate_index = 0
+	_incremental_written = 0
+	_is_incremental_rebuild_active = true
 
-	for row in rows:
-		for column in columns:
-			if written >= capacity:
-				break
-			candidate_count += 1
 
-			var base_x := (float(column) + 0.5) / float(columns) * area_size.x - area_size.x * 0.5
-			var base_z := (float(row) + 0.5) / float(rows) * area_size.y - area_size.y * 0.5
-			var jitter_x := random.randf_range(-0.5, 0.5) * cell_size * position_jitter
-			var jitter_z := random.randf_range(-0.5, 0.5) * cell_size * position_jitter
-			var local_position := Vector3(base_x + jitter_x, 0.02, base_z + jitter_z)
-
-			if absf(local_position.z) < path_clear_half_width:
-				continue
-			if exclusion_rect.has_point(Vector2(local_position.x, local_position.z)):
-				continue
-			if not _is_inside_coverage(local_position, coverage_image):
-				continue
-
-			var uniform_scale := random.randf_range(minimum_scale, maximum_scale)
-			var instance_basis := Basis.IDENTITY.scaled(
-				Vector3(uniform_scale, uniform_scale, uniform_scale)
-			)
-			generated.set_instance_transform(written, Transform3D(instance_basis, local_position))
-			written += 1
-
-	_last_rebuild_benchmark["population_ms"] = _elapsed_ms(population_started_us)
+func _publish_incremental_rebuild() -> void:
 	var publish_started_us := Time.get_ticks_usec()
-	generated.visible_instance_count = written
-	multimesh = generated
+	_incremental_generated.visible_instance_count = _incremental_written
+	multimesh = _incremental_generated
 	_last_rebuild_benchmark["publish_ms"] = _elapsed_ms(publish_started_us)
-	_last_rebuild_benchmark["candidate_count"] = candidate_count
-	_last_rebuild_benchmark["visible_count"] = written
-	_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
+	_last_rebuild_benchmark["population_ms"] = float(_incremental_population_us) / 1000.0
+	_last_rebuild_benchmark["candidate_count"] = _incremental_candidate_index
+	_last_rebuild_benchmark["visible_count"] = _incremental_written
+	_last_rebuild_benchmark["total_ms"] = _elapsed_ms(_incremental_started_us)
+	_is_incremental_rebuild_active = false
+	_incremental_generated = null
+	_incremental_coverage_image = null
+	_incremental_random = null
 
 
 func _load_coverage_image() -> Image:
+	if coverage_image_override != null:
+		return coverage_image_override
 	if coverage_texture == null:
 		return null
 

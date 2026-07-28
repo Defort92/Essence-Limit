@@ -161,9 +161,24 @@ func _print_scene_tree_summary(transition_id: int) -> void:
 
 
 func _print_grass_summary(transition_id: int) -> void:
+	var streaming_grids := get_tree().get_nodes_in_group("grass_streaming_benchmark")
+	for streaming_grid in streaming_grids:
+		if not streaming_grid.has_method("get_streaming_stats"):
+			continue
+		print("%s #%d grass streaming: %s" % [
+			BENCHMARK_PREFIX,
+			transition_id,
+			streaming_grid.get_streaming_stats(),
+		])
+
 	var grass_nodes := get_tree().get_nodes_in_group("grass_benchmark")
 	if grass_nodes.is_empty():
-		print("%s #%d grass: no runtime-generated chunks" % [BENCHMARK_PREFIX, transition_id])
+		var state := (
+			"streaming queued; no chunks generated during scene ready"
+			if not streaming_grids.is_empty()
+			else "no runtime-generated chunks"
+		)
+		print("%s #%d grass: %s" % [BENCHMARK_PREFIX, transition_id, state])
 		return
 
 	var total_ms := 0.0

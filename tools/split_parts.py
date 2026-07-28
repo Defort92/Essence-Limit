@@ -284,20 +284,45 @@ def grounded(parts: dict, leg: str, baseline: int, torso_end: int) -> np.ndarray
 
 
 def build_walk(parts: dict, lift: int, bob: int, baseline: int,
-               head_end: int, torso_end: int) -> list[Image.Image]:
-    """Placeholder 4-frame step cycle: alternate leg lift, torso settles on
-    contact (same waist squash as idle). While one leg is lifted, the other is
-    grounded via shin stretch — the ground contact and all part seams stay
-    locked in every frame."""
-    bob_offsets, bob_replaced = torso_sink(parts, bob, head_end, torso_end)
-    phases = [
-        ({"legs_left": (0, -lift)}, {"legs_right": grounded(parts, "legs_right", baseline, torso_end)}),
-        (bob_offsets, bob_replaced),                      # contact, body settles
-        ({"legs_right": (0, -lift)}, {"legs_left": grounded(parts, "legs_left", baseline, torso_end)}),
-        (bob_offsets, bob_replaced),                      # contact
+               head_end: int, torso_end: int,
+               direction: str = "") -> list[Image.Image]:
+    """Eight-frame placeholder step cycle.
+
+    The extra passing poses make diagonal/profile motion readable at the game's
+    small render size. Profile views also receive a one-pixel upper-body sway;
+    their legs overlap in the source image, so a vertical lift alone is nearly
+    invisible.
+    """
+    half_lift = max(1, round(lift * 0.5))
+    profile_sway = 1 if direction.startswith("full-") else 0
+    phase_specs = [
+        ("legs_left", lift, 0, profile_sway),
+        ("legs_left", half_lift, 0, profile_sway),
+        ("", 0, bob, 0),
+        ("legs_right", half_lift, 0, -profile_sway),
+        ("legs_right", lift, 0, -profile_sway),
+        ("legs_right", half_lift, 0, -profile_sway),
+        ("", 0, bob, 0),
+        ("legs_left", half_lift, 0, profile_sway),
     ]
     frames = []
-    for offsets, replaced in phases:
+    for lifted_leg, leg_lift, body_bob, sway in phase_specs:
+        offsets = {}
+        replaced = {}
+        if lifted_leg:
+            grounded_leg = "legs_right" if lifted_leg == "legs_left" else "legs_left"
+            offsets[lifted_leg] = (0, -leg_lift)
+            replaced[grounded_leg] = grounded(
+                parts, grounded_leg, baseline, torso_end)
+        if body_bob:
+            bob_offsets, bob_replaced = torso_sink(
+                parts, body_bob, head_end, torso_end)
+            offsets.update(bob_offsets)
+            replaced.update(bob_replaced)
+        if sway:
+            head_dx, head_dy = offsets.get("head", (0, 0))
+            offsets["head"] = (head_dx + sway, head_dy)
+            offsets["torso"] = (sway, 0)
         layers = {**parts, **replaced}
         frames.append(compose(layers, offsets))
     return frames
@@ -411,7 +436,7 @@ def process_direction(path: Path, out_root: Path, args) -> tuple[str, dict, list
     head_end, torso_end = meta["cuts"]["head_end"], meta["cuts"]["torso_end"]
     idle = build_idle(parts, args.idle_amp, head_end, torso_end)
     walk = build_walk(parts, args.walk_lift, args.walk_bob,
-                      meta["baseline_y"], head_end, torso_end)
+                      meta["baseline_y"], head_end, torso_end, direction)
 
     frames_dir = out_root / "frames" / direction
     frames_dir.mkdir(parents=True, exist_ok=True)
@@ -437,7 +462,16 @@ def run(input_dir: Path, out_root: Path, args) -> bool:
     integrity and drift check passed."""
     out_root.mkdir(parents=True, exist_ok=True)
 
-    pngs = sorted(input_dir.glob("*.png"))
+    selected = getattr(args, "directions", None)
+    selected_directions = (
+        {canon_direction(item) for item in selected.split(",") if item.strip()}
+        if selected else None
+    )
+    pngs = [
+        path for path in sorted(input_dir.glob("*.png"))
+        if selected_directions is None
+        or canon_direction(path.stem) in selected_directions
+    ]
     if not pngs:
         print(f"Error: no PNG files in {input_dir}")
         return False
@@ -499,6 +533,11 @@ def main():
     parser.add_argument("--idle-amp", type=int, default=2)
     parser.add_argument("--walk-lift", type=int, default=2)
     parser.add_argument("--walk-bob", type=int, default=1)
+    parser.add_argument(
+        "--directions",
+        default="",
+        help="Optional comma-separated subset, e.g. back,front-right,full-right",
+    )
     args = parser.parse_args()
 
     if not args.input_dir.is_dir():

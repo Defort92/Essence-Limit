@@ -30,6 +30,9 @@ class_name DirectionalSprite3D
 ## Кадров в секунду для анимаций покоя и ходьбы.
 @export var idle_fps: float = 6.0
 @export var walk_fps: float = 10.0
+## Переиспользует правые кадры для трёх симметричных левых секторов.
+## Статичные текстуры остаются уникальными; зеркалятся только серии анимации.
+@export var mirror_left_animations := true
 
 
 var _textures: Array[Texture2D] = []
@@ -39,6 +42,7 @@ var _current_index: int = -1
 ## Пусты в статичном режиме.
 var _idle_frames: Array = []
 var _walk_frames: Array = []
+var _animation_flip_h: Array[bool] = []
 ## true — загружена хотя бы одна серия кадров, спрайт работает в анимированном режиме.
 var _has_animation: bool = false
 ## true — проигрывается анимация ходьбы, false — покоя. Ставится игроком через set_moving().
@@ -69,8 +73,18 @@ func _ready() -> void:
 func _load_animation_frames() -> void:
 	_idle_frames.resize(8)
 	_walk_frames.resize(8)
+	_animation_flip_h.resize(8)
 	for sector in 8:
-		var dir_path: String = frames_dir.path_join(DirectionalSpriteConstants.DIR_FOLDERS[sector])
+		var source_sector := sector
+		var mirror_source := DirectionalSpriteConstants.MIRROR_SOURCE_SECTORS[sector]
+		if mirror_left_animations and mirror_source >= 0:
+			source_sector = mirror_source
+			_animation_flip_h[sector] = true
+		else:
+			_animation_flip_h[sector] = false
+		var dir_path: String = frames_dir.path_join(
+			DirectionalSpriteConstants.DIR_FOLDERS[source_sector]
+		)
 		var idle_series: Array[Texture2D] = _load_series(dir_path, "idle")
 		var walk_series: Array[Texture2D] = _load_series(dir_path, "walk")
 		_idle_frames[sector] = idle_series
@@ -118,6 +132,11 @@ func _apply_index(index: int) -> void:
 	if index == _current_index:
 		return
 	_current_index = index
+	flip_h = (
+		_animation_flip_h[index]
+		if _has_animation and index < _animation_flip_h.size()
+		else false
+	)
 	# В статичном режиме текстуру ставим прямо на смене ракурса; в анимированном её каждый
 	# кадр обновляет _process по текущей серии.
 	if not _has_animation and index < _textures.size() and _textures[index] != null:
@@ -145,6 +164,22 @@ func _current_frames() -> Array[Texture2D]:
 	if not primary.is_empty():
 		return primary
 	return _idle_frames[_current_index] if _is_moving else _walk_frames[_current_index]
+
+
+## Диагностика для автоматической проверки анимаций и инструментов.
+func get_animation_frame_count(sector: int, moving: bool) -> int:
+	if sector < 0 or sector >= 8:
+		return 0
+	var series: Array[Texture2D] = _walk_frames[sector] if moving else _idle_frames[sector]
+	return series.size()
+
+
+func is_animation_sector_mirrored(sector: int) -> bool:
+	return (
+		sector >= 0
+		and sector < _animation_flip_h.size()
+		and _animation_flip_h[sector]
+	)
 
 ## Устанавливает базовый оттенок спрайта (расовый/монстровый). Вспышки возвращаются
 ## именно к нему. Вызывай вместо прямого присваивания modulate для стойкого цвета.
