@@ -5,7 +5,16 @@ class_name GrassMultiMeshChunk
 ## Generates a stable grid of slightly randomized grass cards.
 ## The generated transforms live in one MultiMesh and have no physics bodies.
 
+enum BuildMode {
+	USE_EXISTING,
+	GENERATE_IF_EMPTY,
+	ALWAYS_REBUILD,
+}
+
 @export var blade_mesh: Mesh
+## GENERATE_IF_EMPTY prevents loading a serialized buffer and rebuilding it
+## immediately. ALWAYS_REBUILD is intended only for explicit regeneration tests.
+@export var build_mode := BuildMode.GENERATE_IF_EMPTY
 @export var area_size := Vector2(16.0, 16.0)
 @export_range(0.0, 160.0, 1.0) var density_per_square_meter := 30.0
 @export_range(100, 60000, 100) var maximum_instances := 15000
@@ -33,10 +42,21 @@ class_name GrassMultiMeshChunk
 
 var _interaction_accumulator := 0.0
 var _character_positions: Array[Vector4] = []
+var _last_rebuild_benchmark: Dictionary = {}
 
 
 func _ready() -> void:
-	_rebuild()
+	add_to_group("grass_benchmark")
+	match build_mode:
+		BuildMode.USE_EXISTING:
+			_capture_existing_multimesh()
+		BuildMode.GENERATE_IF_EMPTY:
+			if multimesh == null:
+				_rebuild()
+			else:
+				_capture_existing_multimesh()
+		BuildMode.ALWAYS_REBUILD:
+			_rebuild()
 	_character_positions.resize(8)
 	_clear_character_positions()
 	set_process(not interactor_path.is_empty() or not interactor_group.is_empty())
@@ -100,19 +120,52 @@ func get_visible_grass_count() -> int:
 	return multimesh.visible_instance_count
 
 
+func get_rebuild_benchmark() -> Dictionary:
+	return _last_rebuild_benchmark.duplicate()
+
+
+func _capture_existing_multimesh() -> void:
+	_last_rebuild_benchmark = {
+		"action": "used existing",
+		"total_ms": 0.0,
+		"coverage_image_ms": 0.0,
+		"allocation_ms": 0.0,
+		"population_ms": 0.0,
+		"publish_ms": 0.0,
+		"candidate_count": 0,
+		"visible_count": get_visible_grass_count(),
+	}
+
+
 func _rebuild() -> void:
+	var rebuild_started_us := Time.get_ticks_usec()
+	_last_rebuild_benchmark = {
+		"action": "generated",
+		"total_ms": 0.0,
+		"coverage_image_ms": 0.0,
+		"allocation_ms": 0.0,
+		"population_ms": 0.0,
+		"publish_ms": 0.0,
+		"candidate_count": 0,
+		"visible_count": 0,
+	}
 	if blade_mesh == null:
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
 		return
 	if is_zero_approx(density_per_square_meter):
 		multimesh = null
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
 		return
 
+	var coverage_started_us := Time.get_ticks_usec()
 	var coverage_image := _load_coverage_image()
+	_last_rebuild_benchmark["coverage_image_ms"] = _elapsed_ms(coverage_started_us)
 	if coverage_texture != null and (coverage_image == null or coverage_image.is_empty()):
 		push_warning(
 			"Grass coverage texture could not be read; grass generation was disabled for %s." % name
 		)
 		multimesh = null
+		_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
 		return
 
 	var target_count := mini(
@@ -124,6 +177,7 @@ func _rebuild() -> void:
 	var rows := maxi(1, ceili(area_size.y / cell_size))
 	var capacity := mini(maximum_instances, columns * rows)
 
+	var allocation_started_us := Time.get_ticks_usec()
 	var generated := MultiMesh.new()
 	generated.transform_format = MultiMesh.TRANSFORM_3D
 	generated.mesh = blade_mesh
@@ -133,15 +187,19 @@ func _rebuild() -> void:
 		Vector3(-area_size.x * 0.5, -0.1, -area_size.y * 0.5),
 		Vector3(area_size.x, 1.2, area_size.y)
 	)
+	_last_rebuild_benchmark["allocation_ms"] = _elapsed_ms(allocation_started_us)
 
 	var random := RandomNumberGenerator.new()
 	random.seed = random_seed
 	var written := 0
+	var candidate_count := 0
+	var population_started_us := Time.get_ticks_usec()
 
 	for row in rows:
 		for column in columns:
 			if written >= capacity:
 				break
+			candidate_count += 1
 
 			var base_x := (float(column) + 0.5) / float(columns) * area_size.x - area_size.x * 0.5
 			var base_z := (float(row) + 0.5) / float(rows) * area_size.y - area_size.y * 0.5
@@ -163,8 +221,14 @@ func _rebuild() -> void:
 			generated.set_instance_transform(written, Transform3D(instance_basis, local_position))
 			written += 1
 
+	_last_rebuild_benchmark["population_ms"] = _elapsed_ms(population_started_us)
+	var publish_started_us := Time.get_ticks_usec()
 	generated.visible_instance_count = written
 	multimesh = generated
+	_last_rebuild_benchmark["publish_ms"] = _elapsed_ms(publish_started_us)
+	_last_rebuild_benchmark["candidate_count"] = candidate_count
+	_last_rebuild_benchmark["visible_count"] = written
+	_last_rebuild_benchmark["total_ms"] = _elapsed_ms(rebuild_started_us)
 
 
 func _load_coverage_image() -> Image:
@@ -192,3 +256,7 @@ func _is_inside_coverage(local_position: Vector3, coverage_image: Image) -> bool
 	var pixel_x := clampi(roundi(uv.x * float(coverage_image.get_width() - 1)), 0, coverage_image.get_width() - 1)
 	var pixel_y := clampi(roundi(uv.y * float(coverage_image.get_height() - 1)), 0, coverage_image.get_height() - 1)
 	return coverage_image.get_pixel(pixel_x, pixel_y).a >= coverage_threshold
+
+
+func _elapsed_ms(started_us: int) -> float:
+	return float(Time.get_ticks_usec() - started_us) / 1000.0
