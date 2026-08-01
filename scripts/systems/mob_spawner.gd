@@ -23,6 +23,11 @@ class_name MobSpawner
 var _timer: float = 0.0
 var _alive: Array[Node] = []
 
+const SPAWN_POSITION_ATTEMPTS: int = 16
+const SPAWN_BODY_CLEARANCE: float = 0.15
+const SPAWN_CAPSULE_HEIGHT: float = 1.8
+const COMBAT_BODY_MASK: int = 2 | 4
+
 func _ready() -> void:
 	_timer = initial_delay
 	if prewarm:
@@ -46,20 +51,56 @@ func _prune() -> void:
 			live.append(e)
 	_alive = live
 
-func _spawn_one() -> void:
+func _spawn_one() -> bool:
 	if enemy_scene == null:
 		push_error("MobSpawner '%s': enemy_scene не назначен" % name)
-		return
+		return false
+	var collision_radius := enemy_data.collision_radius if enemy_data != null else 0.4
+	var spawn_position := _find_free_spawn_position(collision_radius)
+	if spawn_position == Vector3.INF:
+		# Не создаём врага внутри персонажа. Таймер сделает следующую попытку позже,
+		# когда место около спавнера освободится.
+		return false
 	var enemy := enemy_scene.instantiate()
 	if enemy is Enemy and enemy_data != null:
 		(enemy as Enemy).data = enemy_data
-	var angle: float = randf() * TAU
-	var dist: float = randf_range(spawn_radius * 0.3, spawn_radius)
-	var offset := Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
 	var container: Node = get_parent()
 	if container == null:
 		container = self
+	# Позиция задаётся до add_child: _ready() врага не должен даже на один кадр
+	# выполняться в точке спавнера и пересекаться с находящимся там персонажем.
+	if enemy is Node3D and container is Node3D:
+		(enemy as Node3D).position = (container as Node3D).to_local(spawn_position)
 	container.add_child(enemy)
-	if enemy is Node3D:
-		(enemy as Node3D).global_position = global_position + offset
+	if enemy is Node3D and not container is Node3D:
+		(enemy as Node3D).global_position = spawn_position
 	_alive.append(enemy)
+	return true
+
+
+## Ищет случайную точку, в которой капсула нового врага не пересекает ни игрока,
+## ни союзника, ни уже существующего врага. Если все попытки заняты, спавн откладывается.
+func _find_free_spawn_position(collision_radius: float) -> Vector3:
+	for _attempt in SPAWN_POSITION_ATTEMPTS:
+		var angle: float = randf() * TAU
+		var dist: float = randf_range(spawn_radius * 0.3, spawn_radius)
+		var candidate := global_position + Vector3(cos(angle) * dist, 0.0, sin(angle) * dist)
+		if _is_spawn_position_clear(candidate, collision_radius):
+			return candidate
+	return Vector3.INF
+
+
+## Отдельный helper оставлен доступным тестам и будущим особым спавнерам.
+func _is_spawn_position_clear(world_position: Vector3, collision_radius: float) -> bool:
+	if not is_inside_tree() or get_world_3d() == null:
+		return false
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = maxf(0.05, collision_radius + SPAWN_BODY_CLEARANCE)
+	capsule.height = maxf(SPAWN_CAPSULE_HEIGHT, capsule.radius * 2.0)
+	var query := PhysicsShapeQueryParameters3D.new()
+	query.shape = capsule
+	query.transform = Transform3D(Basis.IDENTITY, world_position + Vector3.UP * SPAWN_CAPSULE_HEIGHT * 0.5)
+	query.collision_mask = COMBAT_BODY_MASK
+	query.collide_with_bodies = true
+	query.collide_with_areas = false
+	return get_world_3d().direct_space_state.intersect_shape(query, 1).is_empty()

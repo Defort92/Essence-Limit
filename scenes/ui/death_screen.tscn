@@ -1,7 +1,6 @@
-[gd_scene load_steps=10 format=3]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/death_screen.gd" id="1_script"]
-[ext_resource type="FontFile" path="res://assets/fonts/RubikPixels-Regular.ttf" id="2_rubik"]
 
 [sub_resource type="Gradient" id="Gradient_bg"]
 offsets = PackedFloat32Array(0, 0.55, 1)
@@ -46,10 +45,6 @@ border_width_top = 2
 border_width_right = 2
 border_width_bottom = 2
 border_color = Color(0.706, 0.196, 0.141, 0.6)
-
-[sub_resource type="FontVariation" id="FontVariation_title"]
-base_font = ExtResource("2_rubik")
-spacing_glyph = 3
 
 [node name="DeathScreen" type="Control"]
 layout_mode = 3
@@ -139,7 +134,6 @@ layout_mode = 2
 layout_mode = 2
 theme_type_variation = &"TitleLabel"
 theme_override_colors/font_color = Color(0.659, 0.141, 0.102, 1)
-theme_override_fonts/font = SubResource("FontVariation_title")
 theme_override_font_sizes/font_size = 64
 text = "ВЫ ПАЛИ"
 horizontal_alignment = 1

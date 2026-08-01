@@ -12,6 +12,29 @@ const DODGE_SPEED: float = 12.0
 
 const DODGE_DURATION: float = 0.25
 
+## Минимальный зазор капсулы от стены/непроходимого тела при расчёте рывка.
+const DODGE_SAFE_MARGIN: float = 0.03
+
+## Шаг поиска ближайшей свободной конечной позиции, если расчётная точка оказалась
+## внутри союзника или проходимого противника.
+const DODGE_LANDING_SEARCH_STEP: float = 0.05
+
+## Дополнительный комфортный зазор посадки от живых тел. Не даёт рывку втиснуть игрока
+## в геометрически допустимую, но практически непроходимую щель между двумя капсулами.
+const DODGE_LANDING_MARGIN: float = 0.12
+
+const COLLISION_LAYER_TERRAIN: int = 1
+const COLLISION_LAYER_PARTY: int = 2
+const COLLISION_LAYER_ENEMIES: int = 4
+const COLLISION_MASK_COMBAT_BODIES: int = COLLISION_LAYER_PARTY | COLLISION_LAYER_ENEMIES
+
+## Физический вес игрока для будущих активных способностей толчка. Обычная ходьба
+## эти значения не использует. Сила увеличивает импульс, но не меняет размер капсулы.
+const PLAYER_BASE_MASS: float = 55.0
+const PLAYER_STRENGTH_MASS_FACTOR: float = 1.5
+const PLAYER_MAX_KNOCKBACK_RESISTANCE: float = 0.75
+const PLAYER_STRENGTH_RESISTANCE_FACTOR: float = 0.01
+
 ## Дистанция до целевой точки (режим бега мышью), на которой персонаж считается пришедшим.
 const MOVE_STOP_DISTANCE: float = 0.2
 
@@ -59,6 +82,26 @@ const AI_CATCHUP_GAIN: float = 0.4
 ## Потолок множителя скорости догона: союзник может бежать до 1.9× быстрее лидера, чтобы
 ## реально сократить разрыв и подтянуться, а не тащиться позади на его же скорости.
 const AI_MAX_CATCHUP_SCALE: float = 1.9
+
+## Навигационная цель обновляется не каждый кадр, если она почти не сдвинулась.
+## Для движущегося лидера/врага заметное изменение позиции обновляет путь немедленно.
+const AI_NAV_REFRESH_INTERVAL: float = 0.2
+const AI_NAV_TARGET_MOVE_THRESHOLD: float = 0.65
+const AI_NAV_MIN_PATH_DISTANCE: float = 1.0
+
+## Локальный look-ahead физической капсулой и углы обхода динамического препятствия.
+## NavigationAgent строит глобальный путь, а этот слой обходит союзников и врагов,
+## которых статическая navigation mesh не учитывает.
+const AI_AVOID_LOOKAHEAD_DISTANCE: float = 0.9
+const AI_AVOID_SHORT_STEP_DISTANCE: float = 0.35
+const AI_AVOID_ANGLES_DEGREES: Array[float] = [35.0, 55.0, 80.0, 110.0]
+const AI_AVOID_COMMIT_DURATION: float = 0.55
+
+## Если AI пытался двигаться, но почти не менял позицию дольше этого времени,
+## включается принудительный обход с устойчиво выбранной стороной.
+const AI_STUCK_TRIGGER_TIME: float = 0.35
+const AI_STUCK_MIN_SPEED: float = 0.18
+const AI_STUCK_EXPECTED_VELOCITY: float = 0.75
 
 ## Дистанция, дальше которой союзник считается потерявшимся (застрял на геометрии, отстал
 ## за закрытой дверью) и телепортируется к лидеру, а не бежит через полкарты.
@@ -127,8 +170,25 @@ const AI_YIELD_LEADER_SPEED_SQ: float = 0.25
 ## Сколько секунд союзник держит шаг в сторону, уступив дорогу, — чтобы шаг не дёргался.
 const AI_YIELD_DURATION: float = 0.45
 
+## Пауза после одного уступания. Без неё продолжающий идти лидер каждый кадр запускал
+## новый боковой шаг, и союзник бесконечно «танцевал» вокруг боевой цели.
+const AI_YIELD_COOLDOWN: float = 0.65
+
 ## Множитель скорости бокового шага при уступании дороги.
 const AI_YIELD_SPEED_SCALE: float = 0.9
+
+## Длина проверяемого бокового шага при уступании. Проверяется всей капсулой через
+## test_move(), поэтому союзник выбирает сторону без стены, дома или другого тела.
+const AI_YIELD_STEP_DISTANCE: float = 1.0
+
+## В бою достаточно короткого смещения по окружности цели: союзник освобождает место
+## активному персонажу, но сохраняет дистанцию атаки и не бросает противника.
+const AI_COMBAT_YIELD_STEP_DISTANCE: float = 0.55
+
+## Скорость и длительность мягкого сдвига союзника активным персонажем, когда
+## заблаговременно уступить дорогу не удалось. На врагов этот механизм не действует.
+const ALLY_SOFT_PUSH_SPEED_SCALE: float = 0.35
+const ALLY_SOFT_PUSH_DURATION: float = 0.18
 
 ## Сколько секунд беглец остаётся в сцене, прежде чем исчезнуть.
 const FLEE_DESPAWN_TIME: float = 6.0

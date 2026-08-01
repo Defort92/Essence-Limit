@@ -2,6 +2,10 @@
 extends Resource
 class_name EnemyData
 
+## Категория физического размера. Используется рывками и будущими эффектами толчка;
+## визуальный масштаб сам по себе не должен неявно менять правила боя.
+enum BodySize { SMALL, MEDIUM, LARGE, HUGE }
+
 @export var mob_type_id: String = "unknown"
 @export var display_name: String = "Враг"
 
@@ -19,6 +23,18 @@ class_name EnemyData
 @export_group("Movement")
 @export var move_speed: float = 2.5
 @export var detection_range: float = 10.0
+
+@export_group("Physics")
+## Радиус физической капсулы в метрах. Высота пока остаётся гуманоидной из базовой сцены.
+@export_range(0.15, 4.0, 0.05) var collision_radius: float = 0.4
+@export var body_size: BodySize = BodySize.MEDIUM
+## Базовая масса для будущих способностей отбрасывания. Обычное движение врагов не толкает.
+@export_range(1.0, 10000.0, 1.0) var mass: float = 70.0
+## Множитель сопротивления будущему отбрасыванию: 0 — без сопротивления, 1 — иммунитет.
+@export_range(0.0, 1.0, 0.05) var knockback_resistance: float = 0.0
+## Можно ли рывком пересечь тело этого врага. Конечная позиция рывка всё равно должна
+## находиться вне любых тел. Ядовитые слаймы, стены и особые боссы могут запретить проход.
+@export var can_dodge_through: bool = true
 
 @export_group("Gear")
 ## Фиксированное оружие врага: stat_bonuses ("damage", "range") добавляются к атаке.
