@@ -10,6 +10,8 @@ extends Control
 @onready var _fullscreen_check: CheckButton = $SettingsOverlay/Panel/Margin/VBoxContainer/FullscreenRow/FullscreenCheck
 @onready var _font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/FontRow/FontOption
 @onready var _body_font_option: OptionButton = $SettingsOverlay/Panel/Margin/VBoxContainer/BodyFontRow/BodyFontOption
+@onready var _camera_distance_slider: HSlider = $SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow/CameraDistanceSlider
+@onready var _camera_distance_value: Label = $SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow/CameraDistanceValue
 
 
 ## Слот, который откроет "Продолжить" (-1 = сохранений нет).
@@ -31,6 +33,8 @@ func _ready() -> void:
 	_volume_slider.value = db_to_linear(AudioServer.get_bus_volume_db(master_bus))
 	_update_volume_label(_volume_slider.value)
 	_fullscreen_check.button_pressed = DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
+	_camera_distance_slider.set_value_no_signal(CameraSettings.distance)
+	_update_camera_distance_label(CameraSettings.distance)
 	_setup_font_option()
 	_new_game_button.grab_focus()
 
@@ -88,6 +92,13 @@ func _on_body_font_selected(index: int) -> void:
 func _on_fullscreen_toggled(pressed: bool) -> void:
 	var mode: DisplayServer.WindowMode = DisplayServer.WINDOW_MODE_FULLSCREEN if pressed else DisplayServer.WINDOW_MODE_WINDOWED
 	DisplayServer.window_set_mode(mode)
+
+func _on_camera_distance_changed(value: float) -> void:
+	CameraSettings.set_distance(value)
+	_update_camera_distance_label(CameraSettings.distance)
+
+func _update_camera_distance_label(value: float) -> void:
+	_camera_distance_value.text = "%.1f" % value
 
 ## Возвращает первый слот с сохранением (0..MAX_SLOTS-1) или -1 если сохранений нет.
 func _find_last_save_slot() -> int:

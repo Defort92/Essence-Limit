@@ -8,7 +8,7 @@ const MOVEMENT_ACTIONS: Array = ["move_up", "move_down", "move_left", "move_righ
 
 ## Прочие привязываемые действия — общие для обоих режимов бега.
 const COMMON_ACTIONS: Array = [
-	"dodge", "interact",
+	"dodge", "interact", "take_all_loot",
 	"ability_1", "ability_2", "ability_3", "ability_4",
 	"consumable_1", "consumable_2", "consumable_3", "consumable_4",
 	"inventory", "states", "party_command",
@@ -21,6 +21,7 @@ const ACTION_LABELS := {
 	"move_right": "Движение вправо",
 	"dodge": "Уклонение",
 	"interact": "Взаимодействие",
+	"take_all_loot": "Забрать весь лут",
 	"ability_1": "Способность 1",
 	"ability_2": "Способность 2",
 	"ability_3": "Способность 3",

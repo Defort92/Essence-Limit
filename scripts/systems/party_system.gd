@@ -22,10 +22,16 @@ var active_index: int = -1
 
 ## Режим позиционирования отряда — циклическая команда одной кнопкой (см.
 ## Player._handle_party_command_input). FREE — свободное следование за лидером с личной
-## формацией; GATHER («Ко мне») — тугой строй вплотную к лидеру; HOLD («Стоять здесь») —
-## союзники не следуют за лидером, держат текущую позицию (бой в радиусе не отключается).
+## формацией; GATHER («Ко мне») — тугой строй вплотную к лидеру; HOLD («Занять позицию») —
+## отряд обороняет область вокруг точки, где находился лидер в момент приказа.
 enum FormationMode { FREE, GATHER, HOLD }
 var formation_mode: FormationMode = FormationMode.FREE
+## Общий центр обороны для режима HOLD — позиция активного персонажа в момент приказа.
+var hold_position: Vector3 = Vector3.ZERO
+## Зафиксированное направление строя: лидер может уйти, но позиции вокруг центра
+## не должны вращаться вслед за ним.
+var hold_facing: Vector3 = Vector3.BACK
+var has_hold_position: bool = false
 
 signal active_member_changed(old_member: Player, new_member: Player)
 signal party_wiped()
@@ -138,14 +144,31 @@ func get_active_inventory() -> InventoryComponent:
 ## Переключает режим формации по кругу FREE → GATHER → HOLD → FREE. Вызывается активным
 ## (управляемым игроком) участником по нажатию кнопки команды отряду.
 func cycle_formation_mode() -> void:
-	formation_mode = ((formation_mode + 1) % FormationMode.size()) as FormationMode
+	set_formation_mode(((formation_mode + 1) % FormationMode.size()) as FormationMode)
+
+## Устанавливает режим и при команде «Занять позицию» фиксирует общий центр обороны
+## в текущей позиции активного персонажа.
+func set_formation_mode(mode: FormationMode) -> void:
+	formation_mode = mode
+	if mode == FormationMode.HOLD:
+		var leader := get_active_member()
+		has_hold_position = leader != null
+		if leader != null:
+			hold_position = leader.global_position
+			var facing := Vector3(leader.velocity.x, 0.0, leader.velocity.z)
+			if facing.length_squared() < 0.01:
+				facing = leader._last_move_dir
+			facing.y = 0.0
+			hold_facing = facing.normalized() if facing.length_squared() > 0.01 else Vector3.BACK
+	else:
+		has_hold_position = false
 	formation_mode_changed.emit(formation_mode)
 
 ## Человекочитаемое имя режима формации (для HUD).
 func formation_mode_name(mode: FormationMode) -> String:
 	match mode:
 		FormationMode.GATHER: return "Ко мне"
-		FormationMode.HOLD: return "Стоять"
+		FormationMode.HOLD: return "Занять позицию"
 		_: return "Свободно"
 
 # ─── Активный участник ──────────────────────────────────────────────────────
@@ -289,6 +312,8 @@ func reset() -> void:
 	roster.clear()
 	active_index = -1
 	formation_mode = FormationMode.FREE
+	has_hold_position = false
+	hold_facing = Vector3.BACK
 
 func _make_roster_entry(race: int, member_name: String, trust: int, role: int = CompanionData.Role.FIGHTER) -> Dictionary:
 	return {

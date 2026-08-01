@@ -6,9 +6,9 @@
 extends Control
 
 
-@onready var _cards_row: HBoxContainer = $Root/CardsRow
+@onready var _cards_column: VBoxContainer = $Root/CardsColumn
 
-## Карточки по id участника: { root, style_border, level_label, style_dot, hp_fill, name_label, morale_label }.
+## Карточки по id участника: портрет, рамка, уровень, индикатор и полоса HP.
 var _cards: Dictionary = {}
 ## Снимок состава (id участников), по которому строится текущая раскладка — для дешёвой
 ## проверки, не изменился ли отряд, без ежекадровой пересборки.
@@ -39,21 +39,23 @@ func _visible_members() -> Array[Player]:
 	return result
 
 func _rebuild(members: Array[Player]) -> void:
-	for child in _cards_row.get_children():
+	for child in _cards_column.get_children():
 		child.queue_free()
 	_cards.clear()
 	_member_ids.clear()
 	for member in members:
 		_member_ids.append(member.get_instance_id())
-		_cards_row.add_child(_build_card(member))
+		_cards_column.add_child(_build_card(member))
 	_update_values(members)
 	visible = not members.is_empty()
 
 func _build_card(member: Player) -> Control:
 	var card := VBoxContainer.new()
-	card.custom_minimum_size = Vector2(PartyPanelConstants.CARD_WIDTH, 0)
+	card.custom_minimum_size = Vector2(
+		PartyPanelConstants.PORTRAIT_SIZE,
+		PartyPanelConstants.PORTRAIT_SIZE
+	)
 	card.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	card.add_theme_constant_override("separation", 3)
 	card.alignment = BoxContainer.ALIGNMENT_CENTER
 
 	# --- Портрет с рамкой, уровнем, точкой-индикатором и полосой HP ---
@@ -120,29 +122,12 @@ func _build_card(member: Player) -> Control:
 
 	card.add_child(portrait)
 
-	# --- Имя и состояние ---
-	var name_label := Label.new()
-	name_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	name_label.clip_text = true
-	name_label.custom_minimum_size = Vector2(PartyPanelConstants.CARD_WIDTH, 0)
-	name_label.add_theme_color_override("font_color", PartyPanelConstants.NAME_COLOR)
-	name_label.add_theme_font_size_override("font_size", 14)
-	card.add_child(name_label)
-
-	var morale_label := Label.new()
-	morale_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	morale_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	morale_label.add_theme_font_size_override("font_size", 12)
-	card.add_child(morale_label)
-
 	_cards[member.get_instance_id()] = {
+		"portrait": portrait,
 		"style_border": style_border,
 		"level_label": level_label,
 		"style_dot": style_dot,
 		"hp_fill": hp_fill,
-		"name_label": name_label,
-		"morale_label": morale_label,
 	}
 	return card
 
@@ -151,7 +136,7 @@ func _make_portrait_image(member: Player) -> Control:
 	var sprite := member.get_node_or_null("Sprite3D") as DirectionalSprite3D
 	if sprite != null and sprite.tex_front != null:
 		var tex := TextureRect.new()
-		tex.texture = sprite.tex_front
+		tex.texture = PortraitUtils.make_face_texture(sprite.tex_front)
 		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		tex.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		tex.clip_contents = true
@@ -176,12 +161,9 @@ func _update_values(members: Array[Player]) -> void:
 
 		var level_label: Label = refs.level_label
 		level_label.text = str(XPSystem.current_level)
-		var name_label: Label = refs.name_label
-		name_label.text = member.member_name if not member.member_name.is_empty() else "Союзник"
-
-		var morale_label: Label = refs.morale_label
-		morale_label.text = str(morale.label)
-		morale_label.add_theme_color_override("font_color", color)
+		var portrait: Control = refs.portrait
+		var member_name := member.member_name if not member.member_name.is_empty() else "Союзник"
+		portrait.tooltip_text = "%s\n%s" % [member_name, str(morale.label)]
 
 		var ratio: float = 0.0
 		if member.max_health > 0:

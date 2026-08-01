@@ -252,9 +252,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -230.0
-offset_top = -255.0
+offset_top = -300.0
 offset_right = 230.0
-offset_bottom = 255.0
+offset_bottom = 300.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -326,6 +326,34 @@ layout_mode = 2
 layout_mode = 2
 script = ExtResource("9_sep")
 
+[node name="CameraDistanceRow" type="HBoxContainer" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="CameraDistanceLabel" type="Label" parent="SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_font_sizes/font_size = 18
+text = "Расстояние камеры"
+
+[node name="CameraDistanceValue" type="Label" parent="SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow"]
+custom_minimum_size = Vector2(36, 0)
+layout_mode = 2
+theme_type_variation = &"MutedLabel"
+text = "11.5"
+
+[node name="CameraDistanceSlider" type="HSlider" parent="SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow"]
+custom_minimum_size = Vector2(150, 20)
+layout_mode = 2
+min_value = 9.0
+max_value = 15.0
+step = 0.5
+value = 11.5
+
+[node name="CameraSeparator" type="ColorRect" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
+layout_mode = 2
+script = ExtResource("9_sep")
+
 [node name="LanguageRow" type="HBoxContainer" parent="SettingsOverlay/Panel/Margin/VBoxContainer"]
 layout_mode = 2
 theme_override_constants/separation = 12
@@ -394,5 +422,6 @@ text = "Назад"
 [connection signal="pressed" from="SettingsOverlay/Panel/Margin/VBoxContainer/BackButton" to="." method="_on_settings_back_pressed"]
 [connection signal="value_changed" from="SettingsOverlay/Panel/Margin/VBoxContainer/VolumeSlider" to="." method="_on_volume_changed"]
 [connection signal="toggled" from="SettingsOverlay/Panel/Margin/VBoxContainer/FullscreenRow/FullscreenCheck" to="." method="_on_fullscreen_toggled"]
+[connection signal="value_changed" from="SettingsOverlay/Panel/Margin/VBoxContainer/CameraDistanceRow/CameraDistanceSlider" to="." method="_on_camera_distance_changed"]
 [connection signal="item_selected" from="SettingsOverlay/Panel/Margin/VBoxContainer/FontRow/FontOption" to="." method="_on_font_selected"]
 [connection signal="item_selected" from="SettingsOverlay/Panel/Margin/VBoxContainer/BodyFontRow/BodyFontOption" to="." method="_on_body_font_selected"]

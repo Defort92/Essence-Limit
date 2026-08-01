@@ -169,6 +169,11 @@ script = ExtResource("24_grass_grid")
 blade_mesh = SubResource("MainGrassBladeMesh")
 grass_material = SubResource("MainGrassMaterial")
 coverage_texture = ExtResource("21_grass_mask")
+density_per_square_meter = 52.0
+maximum_instances_per_chunk = 50000
+coverage_threshold = 0.1
+medium_density_ratio = 0.45
+generation_candidates_per_frame = 3500
 
 [node name="Player" parent="." unique_id=398954163 instance=ExtResource("2")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.8525088, 0)

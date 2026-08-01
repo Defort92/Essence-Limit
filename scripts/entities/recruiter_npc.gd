@@ -5,6 +5,7 @@ extends StaticBody3D
 class_name RecruiterNPC
 
 @export var companion_data: CompanionData
+@export var interaction_priority: int = 10
 
 @onready var _prompt: Label3D = get_node_or_null("PromptLabel") as Label3D
 
@@ -12,6 +13,7 @@ var _player_in_range: bool = false
 
 func _ready() -> void:
 	add_to_group("minimap_object")
+	add_to_group("interactable")
 	$InteractionArea.body_entered.connect(_on_body_entered)
 	$InteractionArea.body_exited.connect(_on_body_exited)
 	# Подсказка показывает актуальную клавишу «interact» — обновляем её при переназначении.
@@ -30,13 +32,19 @@ func _on_body_exited(body: Node3D) -> void:
 		if _prompt != null:
 			_prompt.visible = false
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not _player_in_range or companion_data == null:
-		return
-	if event.is_action_pressed("interact"):
-		if PartySystem.recruit(companion_data):
-			companion_data = null
-			_update_prompt_text()
+func is_interaction_available(interactor: Node3D) -> bool:
+	return companion_data != null and interactor == PartySystem.get_active_member() \
+		and $InteractionArea.overlaps_body(interactor)
+
+func get_interaction_priority() -> int:
+	return interaction_priority
+
+func interact(_interactor: Node3D) -> bool:
+	if not PartySystem.recruit(companion_data):
+		return false
+	companion_data = null
+	_update_prompt_text()
+	return true
 
 func _update_prompt_text() -> void:
 	if _prompt == null:

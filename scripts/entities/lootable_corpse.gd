@@ -22,6 +22,7 @@ var corpse_name: String = "Тело"
 ## Спрайт врага для визуального трупа (у союзника не используется — его тело остаётся в сцене).
 var corpse_texture: Texture2D = null
 var corpse_tint: Color = Color.WHITE
+@export var interaction_priority: int = 0
 
 var _player_in_range: bool = false
 var _prompt: Label3D = null
@@ -31,6 +32,7 @@ signal loot_changed()
 
 func _ready() -> void:
 	add_to_group("lootable")
+	add_to_group("interactable")
 	collision_layer = 0
 	collision_mask = 2  # слой отряда (party) — обыскивают только участники отряда
 	var col := CollisionShape3D.new()
@@ -91,14 +93,18 @@ func _is_valid_looter(body: Node) -> bool:
 		return false
 	return (body as Player).state != Player.State.DEAD
 
-func _unhandled_input(event: InputEvent) -> void:
-	if not _player_in_range or is_empty():
-		return
-	if event.is_action_pressed("interact"):
-		var ui := get_tree().get_first_node_in_group("loot_ui")
-		if ui != null and ui.has_method("open"):
-			ui.open(self)
-			get_viewport().set_input_as_handled()
+func is_interaction_available(interactor: Node3D) -> bool:
+	return not is_empty() and _is_valid_looter(interactor) and overlaps_body(interactor)
+
+func get_interaction_priority() -> int:
+	return interaction_priority
+
+func interact(_interactor: Node3D) -> bool:
+	var ui := get_tree().get_first_node_in_group("loot_ui")
+	if ui == null or not ui.has_method("open"):
+		return false
+	ui.open(self)
+	return true
 
 func _on_source_changed() -> void:
 	loot_changed.emit()

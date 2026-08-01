@@ -31,7 +31,9 @@ enum BuildMode {
 var coverage_image_override: Image
 @export var coverage_world_origin := Vector2(-30.0, -30.0)
 @export var coverage_world_size := Vector2(60.0, 60.0)
-@export_range(0.0, 1.0, 0.01) var coverage_threshold := 0.72
+## Keep this close to GRASS_COVERAGE_BLEND_START in the terrain shader. A high
+## threshold creates a visible green strip without blades along every border.
+@export_range(0.0, 1.0, 0.01) var coverage_threshold := 0.10
 
 ## Keeps the prototype's horizontal modular path free from grass.
 @export_range(0.0, 4.0, 0.05) var path_clear_half_width := 1.05

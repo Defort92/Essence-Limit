@@ -10,8 +10,11 @@ class_name GrassChunkGrid
 @export var coverage_texture: Texture2D
 @export var map_size := Vector2(300.0, 300.0)
 @export var chunk_size := Vector2(30.0, 30.0)
-@export_range(0.0, 160.0, 1.0) var density_per_square_meter := 38.0
-@export_range(100, 60000, 100) var maximum_instances_per_chunk := 35000
+@export_range(0.0, 160.0, 1.0) var density_per_square_meter := 52.0
+@export_range(100, 60000, 100) var maximum_instances_per_chunk := 50000
+## Matches the beginning of the terrain shader's green blend, so the visible
+## green border is planted instead of leaving a bare ring around grass patches.
+@export_range(0.0, 1.0, 0.01) var coverage_threshold := 0.10
 @export var random_seed := 8042
 @export var interactor_group: StringName = &"party"
 ## Millions of overlapping grass cards create severe self-shadowing. Keep
@@ -23,8 +26,8 @@ class_name GrassChunkGrid
 @export var streaming_focus_group: StringName = &"player"
 @export_range(0, 4, 1) var near_radius_chunks := 1
 @export_range(1, 6, 1) var medium_radius_chunks := 2
-@export_range(0.05, 1.0, 0.05) var medium_density_ratio := 0.25
-@export_range(100, 10000, 100) var generation_candidates_per_frame := 2200
+@export_range(0.05, 1.0, 0.05) var medium_density_ratio := 0.45
+@export_range(100, 10000, 100) var generation_candidates_per_frame := 3500
 @export_range(0.05, 2.0, 0.05) var fade_duration_seconds := 0.25
 @export_range(0.05, 1.0, 0.05) var focus_check_interval_seconds := 0.2
 @export_range(0, 32, 1) var cached_chunk_limit := 8
@@ -268,6 +271,7 @@ func _create_chunk(
 	chunk.coverage_image_override = _coverage_image
 	chunk.coverage_world_origin = _world_origin
 	chunk.coverage_world_size = map_size
+	chunk.coverage_threshold = coverage_threshold
 	chunk.path_clear_half_width = 0.0
 	chunk.exclusion_rect = Rect2()
 	chunk.interactor_group = interactor_group if lod == GrassLod.NEAR else &""

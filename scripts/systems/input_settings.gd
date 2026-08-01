@@ -85,6 +85,8 @@ func _apply_binding(action: String, physical_keycode: int) -> void:
 
 func _save_to_disk(bindings: Dictionary) -> void:
 	var cfg := ConfigFile.new()
+	# Preserve display settings such as fonts and camera distance.
+	cfg.load(InputSettingsConstants.SETTINGS_PATH)
 	cfg.set_value("controls", "movement_mode", int(movement_mode))
 	for action in bindings:
 		cfg.set_value("keybinds", str(action), int(bindings[action]))

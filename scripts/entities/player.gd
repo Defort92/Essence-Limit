@@ -103,6 +103,7 @@ func _ready() -> void:
 	add_to_group("combatants")
 	_sprite = get_node_or_null("Sprite3D") as DirectionalSprite3D
 	PartySystem.register_member(self)  # назначает roster_index и control_mode
+	PartySystem.formation_mode_changed.connect(_on_formation_mode_changed)
 	_init_from_roster()
 	AchievementSystem.apply_accumulated_to_player(self)
 	DungeonPortal.portal_closed.connect(_on_portal_closed)
@@ -125,18 +126,28 @@ func _physics_process(delta: float) -> void:
 	match state:
 		State.IDLE, State.MOVE:
 			if control_mode == ControlMode.HUMAN:
-				_handle_movement(delta)
-				_handle_attack_input()
-				_handle_block_input()
-				_handle_dodge_input()
-				_handle_consumable_input()
-				_handle_party_command_input()
+				if _is_gameplay_input_blocked():
+					_has_move_target = false
+					is_blocking = false
+					_stop_horizontal()
+				else:
+					_handle_movement(delta)
+					_handle_attack_input()
+					_handle_block_input()
+					_handle_dodge_input()
+					_handle_consumable_input()
+					_handle_party_command_input()
 			else:
 				_ai_process(delta)
 		State.ATTACK:
 			if control_mode == ControlMode.HUMAN:
-				_handle_movement(delta)
-				_handle_block_input()
+				if _is_gameplay_input_blocked():
+					_has_move_target = false
+					is_blocking = false
+					_stop_horizontal()
+				else:
+					_handle_movement(delta)
+					_handle_block_input()
 			else:
 				# ИИ во время замаха стоит на месте, плавно гася инерцию, — иначе союзник
 				# доезжает по инерции («скользит») весь ATTACK_STATE_DURATION.
@@ -158,6 +169,14 @@ func _physics_process(delta: float) -> void:
 		_sprite.set_moving(horiz_speed_sq > PlayerConstants.MOVE_ANIM_THRESHOLD_SQ)
 
 	move_and_slide()
+
+## UI не останавливает мир, но команды управляемого персонажа не проходят сквозь
+## открытое окно и в кадре его закрытия.
+func _is_gameplay_input_blocked() -> bool:
+	for screen in get_tree().get_nodes_in_group("modal_screen"):
+		if screen.has_method("is_gameplay_input_blocking") and screen.is_gameplay_input_blocking():
+			return true
+	return false
 
 # ─── Здоровье ──────────────────────────────────────────────────────────────
 
@@ -534,7 +553,7 @@ func set_quick_slot(slot_idx: int, item_id: String) -> void:
 # ─── Управление отрядом (PartySystem) ──────────────────────────────────────
 
 ## Циклическая команда отряду по кнопке "party_command": переключает режим формации
-## FREE → GATHER («Ко мне») → HOLD («Стоять») → FREE. Обрабатывается только активным
+## FREE → GATHER («Ко мне») → HOLD («Занять позицию») → FREE. Обрабатывается активным
 ## (управляемым игроком) участником, поэтому вызывается из HUMAN-ветки _physics_process.
 func _handle_party_command_input() -> void:
 	if Input.is_action_just_pressed("party_command"):
@@ -633,6 +652,11 @@ var _ai_yield_timer: float = 0.0
 ## формации, false — стоит на месте. Переключается на разных порогах входа/выхода, чтобы
 ## не дёргаться туда-сюда у границы дистанции.
 var _ai_is_following: bool = false
+## В режиме «Ко мне» true, пока союзник возвращается к лидеру после выхода за боевой
+## радиус. Сбрасывается только внутри меньшего порога, чтобы исключить метание на границе.
+var _ai_is_regrouping: bool = false
+## Гистерезис возврата в допустимую область вокруг общей точки обороны PartySystem.
+var _ai_is_returning_to_hold: bool = false
 ## Направление бокового шага при уступании дороги (мировые координаты, нормализовано).
 var _ai_yield_dir: Vector3 = Vector3.ZERO
 ## Накопленное время ИИ — фаза для осцилляций дрейфа.
@@ -652,6 +676,18 @@ func _ai_process(delta: float) -> void:
 	if _is_fleeing:
 		_ai_flee()
 		return
+	# «Ко мне» имеет приоритет над уже выбранной боевой целью: удалившийся союзник
+	# прерывает бой и возвращается к лидеру. Рядом с лидером авто-бой остаётся доступен.
+	if _ai_should_regroup():
+		_ai_cached_target = null
+		_ai_follow_leader()
+		return
+	# «Занять позицию» разрешает оборону, но не бесконечное преследование: вышедший
+	# за границу союзник бросает цель и возвращается к общей точке приказа.
+	if _ai_should_return_to_hold():
+		_ai_cached_target = null
+		_ai_return_to_hold_anchor()
+		return
 	# Лекарь в составе отряда не сражается вовсе — только лечит и держится за лидером.
 	# Предатель-лекарь теряет роль и дерётся как боец (иначе враг, который ничего не делает).
 	if combat_role == CompanionData.Role.HEALER and PartySystem.members.has(self):
@@ -669,14 +705,87 @@ func _ai_process(delta: float) -> void:
 		# Предатель без цели в радиусе — стоит на месте, за отрядом не ходит.
 		_ai_hold_position()
 
-## Вне боя: следовать за лидером либо стоять на месте — по режиму формации отряда.
-## В режиме HOLD («Стоять здесь») союзник держит текущую позицию и за лидером не идёт;
-## авто-бой в радиусе при этом сохраняется (см. _ai_process — engage идёт до этой ветки).
+## Проверяет боевую привязку режима «Ко мне». Вход в возврат выполняется по внешнему
+## порогу, выход — по меньшему внутреннему: противник у самой границы не заставляет
+## союзника каждый кадр разворачиваться то к нему, то к лидеру.
+func _ai_should_regroup() -> bool:
+	if not PartySystem.members.has(self):
+		_ai_is_regrouping = false
+		return false
+	if PartySystem.formation_mode != PartySystem.FormationMode.GATHER:
+		_ai_is_regrouping = false
+		return false
+	var leader := PartySystem.get_active_member()
+	if leader == null or leader == self:
+		_ai_is_regrouping = false
+		return false
+	var gap: Vector3 = leader.global_position - global_position
+	gap.y = 0.0
+	var leader_distance := gap.length()
+	if _ai_is_regrouping:
+		if leader_distance <= PlayerConstants.AI_GATHER_REENGAGE_DISTANCE:
+			_ai_is_regrouping = false
+	elif leader_distance > PlayerConstants.AI_GATHER_COMBAT_LEASH:
+		_ai_is_regrouping = true
+	return _ai_is_regrouping
+
+## Сбрасывает кеш цели, чтобы новый приказ применился на следующем AI-тике без ожидания.
+## Общую точку режима HOLD фиксирует PartySystem до отправки этого сигнала.
+func _on_formation_mode_changed(_mode: PartySystem.FormationMode) -> void:
+	_ai_cached_target = null
+	_ai_retarget_timer = 0.0
+	_ai_is_regrouping = false
+	_ai_is_returning_to_hold = false
+
+## true, пока союзник возвращается внутрь безопасной области своего поста.
+func _ai_should_return_to_hold() -> bool:
+	if not PartySystem.members.has(self) \
+			or PartySystem.formation_mode != PartySystem.FormationMode.HOLD \
+			or not PartySystem.has_hold_position:
+		_ai_is_returning_to_hold = false
+		return false
+	var gap := PartySystem.hold_position - global_position
+	gap.y = 0.0
+	var anchor_distance := gap.length()
+	if _ai_is_returning_to_hold:
+		if anchor_distance <= PlayerConstants.AI_HOLD_REENGAGE_DISTANCE:
+			_ai_is_returning_to_hold = false
+	elif anchor_distance > PlayerConstants.AI_HOLD_COMBAT_LEASH:
+		_ai_is_returning_to_hold = true
+	return _ai_is_returning_to_hold
+
+## Вне боя: следовать за лидером либо вернуться в общую точку обороны — по режиму отряда.
+## В HOLD («Занять позицию») авто-бой внутри заданного радиуса сохраняется.
 func _ai_follow_or_hold() -> void:
 	if PartySystem.formation_mode == PartySystem.FormationMode.HOLD:
-		_ai_hold_position()
+		_ai_return_to_hold_anchor()
 	else:
 		_ai_follow_leader()
+
+## Возвращает союзника на его личное место в строю вокруг общей позиции приказа.
+func _ai_return_to_hold_anchor() -> void:
+	if not PartySystem.has_hold_position:
+		_ai_hold_position()
+		return
+	var slot_position := _ai_hold_slot_position()
+	var gap := slot_position - global_position
+	gap.y = 0.0
+	if gap.length() > PlayerConstants.AI_HOLD_ANCHOR_TOLERANCE:
+		_ai_move_toward(slot_position)
+	else:
+		_ai_hold_position()
+
+## Личная точка союзника рядом с общим центром обороны. Использует те же уникальные
+## смещения отряда, но ориентация фиксируется в момент команды «Занять позицию».
+func _ai_hold_slot_position() -> Vector3:
+	if not PartySystem.has_hold_position:
+		return global_position
+	var facing := PartySystem.hold_facing
+	facing.y = 0.0
+	facing = facing.normalized() if facing.length_squared() > 0.01 else Vector3.BACK
+	var right := facing.cross(Vector3.UP).normalized()
+	var local := _ai_formation_offset()
+	return PartySystem.hold_position + right * local.x - facing * local.z
 
 ## Возвращает ближайшую живую враждебную по фракции цель в радиусе AI_ENGAGE_RANGE.
 ## Фракционный поиск (не группа "enemies"): у лояльного союзника цели — монстры,
@@ -684,8 +793,23 @@ func _ai_follow_or_hold() -> void:
 func _ai_find_target() -> Node3D:
 	var nearest: Node3D = null
 	var nearest_dist: float = PlayerConstants.AI_ENGAGE_RANGE
+	var gather_leader: Player = null
+	if PartySystem.members.has(self) \
+			and PartySystem.formation_mode == PartySystem.FormationMode.GATHER:
+		gather_leader = PartySystem.get_active_member()
 	for candidate in get_tree().get_nodes_in_group("combatants"):
 		if not _is_hostile_target(candidate):
+			continue
+		# «Ко мне» ограничивает не только положение союзника, но и область допустимого
+		# боя. Иначе после возвращения он снова выберет того же далёкого врага.
+		if gather_leader != null \
+				and gather_leader.global_position.distance_to(candidate.global_position) \
+				> PlayerConstants.AI_GATHER_COMBAT_LEASH:
+			continue
+		if PartySystem.formation_mode == PartySystem.FormationMode.HOLD \
+				and PartySystem.has_hold_position \
+				and PartySystem.hold_position.distance_to(candidate.global_position) \
+				> PlayerConstants.AI_HOLD_COMBAT_LEASH:
 			continue
 		var dist: float = global_position.distance_to(candidate.global_position)
 		if dist < nearest_dist:
@@ -706,6 +830,12 @@ func _ai_flee() -> void:
 func _ai_engage(enemy: Node3D) -> void:
 	var atk_range := _get_attack_range()
 	var dist: float = global_position.distance_to(enemy.global_position)
+	var to_enemy := enemy.global_position - global_position
+	to_enemy.y = 0.0
+	if to_enemy.length_squared() > 0.001:
+		# Стоящий защитник тоже должен развернуться к подошедшему сзади врагу; иначе
+		# фронтальная проверка melee-удара отбрасывает атаку, хотя цель уже выбрана.
+		_last_move_dir = to_enemy.normalized()
 	var is_ranged := _ai_is_ranged_role()
 	var desired_range: float = atk_range * 0.85 if is_ranged else max(0.5, atk_range * 0.6)
 	if dist > desired_range:

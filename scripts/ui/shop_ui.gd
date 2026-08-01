@@ -1,6 +1,6 @@
 ## Оверлей лавки: покупка у торговца и продажа предметов из рюкзака.
 ## Открывается вызовом open(vendor) — вызывается NPC-торговцем (см. vendor_npc.gd)
-## через группу "shop_ui". Каркас модалки (пауза, закрытие крестиком/ESC) — в UIModalScreen.
+## через группу "shop_ui". Каркас модалки (блокировка управления, закрытие крестиком/ESC) — в UIModalScreen.
 extends UIModalScreen
 
 @onready var _vendor_name_label: Label = $Dim/CenterContainer/Panel/Margin/VBoxContainer/HeaderRow/VendorNameLabel
@@ -16,7 +16,7 @@ func _ready() -> void:
 	ShopSystem.item_bought.connect(func(_v, _i, _q) -> void: _refresh())
 	ShopSystem.item_sold.connect(func(_i, _q) -> void: _refresh())
 
-## Открывает лавку [param vendor] и ставит игру на паузу.
+## Открывает лавку [param vendor], не останавливая мир.
 func open(vendor: VendorData) -> void:
 	_current_vendor = vendor
 	_vendor_name_label.text = vendor.display_name
