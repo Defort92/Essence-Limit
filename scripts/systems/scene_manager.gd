@@ -6,10 +6,15 @@ signal scene_changed(scene_path: String)
 
 const BENCHMARK_PREFIX := "[SceneBenchmark]"
 const BENCHMARK_WARNING_MS := 250.0
+const SCENE_CACHE_LIMIT := 3
 
 var _transition_id := 0
 var _transition_in_progress := false
 var _benchmark: Dictionary = {}
+## Сильные ссылки не дают ResourceLoader выбросить только что посещённые сцены.
+## LRU-лимит не позволяет кэшу расти вместе с количеством этажей подземелья.
+var _scene_cache: Dictionary = {}
+var _scene_cache_order: Array[String] = []
 
 ## Меняет сцену на произвольный путь.
 func go_to(scene_path: String) -> void:
@@ -19,9 +24,18 @@ func go_to(scene_path: String) -> void:
 			scene_path,
 		])
 		return
-
 	if not OS.is_debug_build():
-		get_tree().change_scene_to_file(scene_path)
+		var packed_scene := _get_cached_scene(scene_path)
+		if packed_scene == null:
+			push_error("Could not load scene: %s" % scene_path)
+			return
+		_transition_in_progress = true
+		_watch_release_scene_change()
+		var change_error := get_tree().change_scene_to_packed(packed_scene)
+		if change_error != OK:
+			_transition_in_progress = false
+			push_error("Could not change scene to %s: error %d" % [scene_path, change_error])
+			return
 		scene_changed.emit(scene_path)
 		return
 
@@ -31,7 +45,7 @@ func go_to(scene_path: String) -> void:
 	var source_path := _current_scene_path()
 	var started_us := Time.get_ticks_usec()
 	var memory_before := OS.get_static_memory_usage()
-	var was_cached := ResourceLoader.has_cached(scene_path)
+	var was_cached := _scene_cache.has(scene_path) or ResourceLoader.has_cached(scene_path)
 
 	print("\n%s #%d START %s -> %s" % [
 		BENCHMARK_PREFIX,
@@ -40,20 +54,23 @@ func go_to(scene_path: String) -> void:
 		scene_path,
 	])
 
-	var dependency_scan_started_us := Time.get_ticks_usec()
-	var dependencies := ResourceLoader.get_dependencies(scene_path)
-	var dependency_scan_ms := _elapsed_ms(dependency_scan_started_us)
-	print("%s #%d dependencies: %.2f ms, direct=%d" % [
-		BENCHMARK_PREFIX,
-		transition_id,
-		dependency_scan_ms,
-		dependencies.size(),
-	])
-	for dependency in dependencies:
-		print("%s #%d   dependency: %s" % [BENCHMARK_PREFIX, transition_id, dependency])
+	var dependencies: PackedStringArray = []
+	var dependency_scan_ms := 0.0
+	if OS.is_debug_build():
+		var dependency_scan_started_us := Time.get_ticks_usec()
+		dependencies = ResourceLoader.get_dependencies(scene_path)
+		dependency_scan_ms = _elapsed_ms(dependency_scan_started_us)
+		print("%s #%d dependencies: %.2f ms, direct=%d" % [
+			BENCHMARK_PREFIX,
+			transition_id,
+			dependency_scan_ms,
+			dependencies.size(),
+		])
+		for dependency in dependencies:
+			print("%s #%d   dependency: %s" % [BENCHMARK_PREFIX, transition_id, dependency])
 
 	var load_started_us := Time.get_ticks_usec()
-	var packed_scene := ResourceLoader.load(scene_path, "PackedScene") as PackedScene
+	var packed_scene := _get_cached_scene(scene_path)
 	var resource_load_ms := _elapsed_ms(load_started_us)
 	if packed_scene == null:
 		_transition_in_progress = false
@@ -107,6 +124,29 @@ func go_to(scene_path: String) -> void:
 		return
 
 	scene_changed.emit(scene_path)
+
+
+func _watch_release_scene_change() -> void:
+	await get_tree().scene_changed
+	_transition_in_progress = false
+
+
+func _get_cached_scene(scene_path: String) -> PackedScene:
+	var cached := _scene_cache.get(scene_path) as PackedScene
+	if cached != null:
+		_scene_cache_order.erase(scene_path)
+		_scene_cache_order.append(scene_path)
+		return cached
+
+	var packed := ResourceLoader.load(scene_path, "PackedScene") as PackedScene
+	if packed == null:
+		return null
+	_scene_cache[scene_path] = packed
+	_scene_cache_order.append(scene_path)
+	while _scene_cache_order.size() > SCENE_CACHE_LIMIT:
+		var evicted_path: String = _scene_cache_order.pop_front()
+		_scene_cache.erase(evicted_path)
+	return packed
 
 
 func _watch_scene_change(transition_id: int) -> void:

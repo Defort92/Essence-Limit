@@ -1,6 +1,10 @@
 extends SceneTree
 
 const FRAMES_DIR := "res://assets/sprites/characters/base/frames"
+const FRONT_MOVEMENT_FRAMES_DIR := (
+	"res://assets/sprites/characters/base/frames/front/run_v10_source_exact"
+)
+const RUN_FRAME_COUNTS: PackedInt32Array = [8, 8, 8, 8, 8, 8, 8, 8]
 const DIRECTIONS: Array[Vector3] = [
 	Vector3(0.0, 0.0, 1.0),
 	Vector3(1.0, 0.0, 1.0),
@@ -20,14 +24,21 @@ func _initialize() -> void:
 func _run_test() -> void:
 	var sprite := DirectionalSprite3D.new()
 	sprite.frames_dir = FRAMES_DIR
+	sprite.movement_frames_subdir = "run_v1"
+	sprite.movement_frames_prefix = "run"
+	sprite.front_movement_frames_dir = FRONT_MOVEMENT_FRAMES_DIR
+	sprite.front_movement_frames_prefix = "run"
 	root.add_child(sprite)
 	await process_frame
 
 	for sector in 8:
 		var walk_count := sprite.get_animation_frame_count(sector, true)
 		var idle_count := sprite.get_animation_frame_count(sector, false)
-		if walk_count != 8:
-			push_error("Sector %d has %d walk frames instead of 8." % [sector, walk_count])
+		if walk_count != RUN_FRAME_COUNTS[sector]:
+			push_error(
+				"Sector %d has %d run frames instead of %d."
+				% [sector, walk_count, RUN_FRAME_COUNTS[sector]]
+			)
 			quit(1)
 			return
 		if idle_count != 4:
@@ -40,6 +51,17 @@ func _run_test() -> void:
 		sprite.set_moving(true)
 		sprite._process(0.0)
 		var first_frame_path := sprite.texture.resource_path
+		var expected_run_dir := (
+			FRONT_MOVEMENT_FRAMES_DIR
+			if sector == 0
+			else FRAMES_DIR.path_join(
+				DirectionalSpriteConstants.DIR_FOLDERS[sector if sector < 5 else 8 - sector]
+			).path_join("run_v1")
+		)
+		if not first_frame_path.begins_with(expected_run_dir):
+			push_error("Sector %d did not load its run animation." % sector)
+			quit(1)
+			return
 		sprite._process(1.0 / sprite.walk_fps + 0.001)
 		if sprite.texture.resource_path == first_frame_path:
 			push_error("Sector %d did not advance its walk animation." % sector)

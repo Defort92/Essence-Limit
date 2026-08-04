@@ -12,13 +12,26 @@ static var _style_hover: StyleBoxFlat = null
 
 ## Собирает строку: растягивающийся текст слева, кнопки действий справа.
 ## [param actions] — массив словарей { "text": String, "callback": Callable }.
-static func create(label_text: String, actions: Array = []) -> UIListRow:
+## [param icon] — необязательная иконка предмета слева от текста.
+static func create(label_text: String, actions: Array = [], icon: Texture2D = null) -> UIListRow:
 	var row := UIListRow.new()
 	row.add_theme_constant_override("separation", 10)
+	row.alignment = BoxContainer.ALIGNMENT_CENTER
+
+	if icon != null:
+		var icon_rect := TextureRect.new()
+		icon_rect.custom_minimum_size = UIListRowConstants.ITEM_ICON_SIZE
+		icon_rect.texture = icon
+		icon_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_rect.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		icon_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		row.add_child(icon_rect)
 
 	var label := Label.new()
 	label.text = label_text
 	label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	label.add_theme_color_override("font_color", UIListRowConstants.TEXT_COLOR)
 	row.add_child(label)
 

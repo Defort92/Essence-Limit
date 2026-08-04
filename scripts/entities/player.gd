@@ -26,6 +26,10 @@ var control_mode: ControlMode = ControlMode.HUMAN
 ## до регистрации (PartySystem назначит 0 — герой) и у покинувших отряд (предатель/беглец).
 var roster_index: int = -1
 
+## Предметы, которые получает только новый главный герой при создании первого состава отряда.
+## При переходах между сценами и загрузке сохранения повторно не выдаются.
+@export var starting_inventory: Array[ItemData] = []
+
 ## Раса участника: у героя — из создания персонажа, у наёмника — из CompanionData.
 ## Определяет базовые статы через GameManagerConstants.RACE_BASE_STATS.
 var race: int = 0
@@ -53,6 +57,7 @@ var _is_fleeing: bool = false
 @onready var statuses: StatusComponent = $Statuses
 @onready var inventory: InventoryComponent = $Inventory
 @onready var _nav_agent: NavigationAgent3D = get_node_or_null("NavigationAgent3D") as NavigationAgent3D
+@onready var _weapon_sprite = $WeaponSprite3D
 
 var _dodge_timer: float = 0.0
 var _dodge_direction: Vector3 = Vector3.ZERO
@@ -108,12 +113,17 @@ signal died()
 signal trust_changed(new_value: int)
 
 func _ready() -> void:
+	var is_new_main_character := roster_index == -1 and PartySystem.roster.is_empty()
 	add_to_group("party")
 	add_to_group("combatants")
 	_sprite = get_node_or_null("Sprite3D") as DirectionalSprite3D
 	PartySystem.register_member(self)  # назначает roster_index и control_mode
 	PartySystem.formation_mode_changed.connect(_on_formation_mode_changed)
 	_init_from_roster()
+	if is_new_main_character:
+		for item: ItemData in starting_inventory:
+			if item != null:
+				inventory.add_item(item)
 	_ai_last_progress_position = global_position
 	AchievementSystem.apply_accumulated_to_player(self)
 	DungeonPortal.portal_closed.connect(_on_portal_closed)
@@ -121,6 +131,7 @@ func _ready() -> void:
 	essence.essence_equipped.connect(_on_essence_changed)
 	essence.essence_removed.connect(_on_essence_slot_cleared)
 	equipment.equipment_changed.connect(_on_equipment_changed)
+	_sync_equipment_visuals()
 	# Демо-раздача статусов «как будто выданных на уровне»: экран состояний и панель HUD
 	# наполняются сразу, до появления реальных источников (аур этажей, эссенций).
 	statuses.grant_demo_statuses()
@@ -1571,6 +1582,14 @@ func _on_essence_slot_cleared(_slot_index: int) -> void:
 
 func _on_equipment_changed() -> void:
 	_recalculate_derived_stats()
+	_sync_equipment_visuals()
+
+
+func _sync_equipment_visuals() -> void:
+	if _weapon_sprite == null:
+		return
+	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	_weapon_sprite.set_frames_dir(weapon.sprite_frames_dir if weapon != null else "")
 
 ## Пересчитывает max_health по формуле (base + ADD_mods) * MULTIPLY_mods.
 func _recalculate_derived_stats() -> void:

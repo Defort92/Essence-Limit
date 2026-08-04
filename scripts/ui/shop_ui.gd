@@ -39,7 +39,8 @@ func _rebuild_buy_list() -> void:
 	for item: ItemData in _current_vendor.stock:
 		_buy_list.add_child(UIListRow.create(
 			"%s — %d зол." % [item.display_name, item.buy_price],
-			[{"text": "Купить", "callback": func() -> void: ShopSystem.buy(_current_vendor, item, 1)}]
+			[{"text": "Купить", "callback": func() -> void: ShopSystem.buy(_current_vendor, item, 1)}],
+			item.icon
 		))
 
 func _rebuild_sell_list() -> void:
@@ -54,5 +55,6 @@ func _rebuild_sell_list() -> void:
 			continue
 		_sell_list.add_child(UIListRow.create(
 			"%s x%d — %d зол." % [item.display_name, slot.quantity, item.sell_price],
-			[{"text": "Продать", "callback": func() -> void: ShopSystem.sell(item, 1)}]
+			[{"text": "Продать", "callback": func() -> void: ShopSystem.sell(item, 1)}],
+			item.icon
 		))

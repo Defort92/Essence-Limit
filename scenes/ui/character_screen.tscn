@@ -1,8 +1,9 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/character_screen.gd" id="1_script"]
 [ext_resource type="Script" path="res://scripts/ui/components/ui_close_button.gd" id="2_close"]
 [ext_resource type="Script" path="res://scripts/ui/components/ui_separator.gd" id="3_sep"]
+[ext_resource type="PackedScene" path="res://scenes/ui/components/item_details_popup.tscn" id="4_details"]
 
 [node name="CharacterScreen" type="CanvasLayer"]
 script = ExtResource("1_script")
@@ -136,5 +137,7 @@ layout_mode = 2
 theme_type_variation = &"MutedLabel"
 theme_override_font_sizes/font_size = 14
 text = "Удалить эссенцию можно лишь в городе за плату."
+
+[node name="ItemDetailsPopup" parent="." instance=ExtResource("4_details")]
 
 [connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/HeaderRow/CloseButton" to="." method="_on_close_pressed"]
