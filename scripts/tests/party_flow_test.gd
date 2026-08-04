@@ -47,6 +47,80 @@ func _ready() -> void:
 		if companion.combat_role != CompanionData.Role.FIGHTER:
 			failures.append("combat_role варвара: %d (ожидался FIGHTER)" % companion.combat_role)
 
+		# В режиме «Ко мне» бой допустим рядом с лидером, но удалившийся союзник обязан
+		# возвращаться до внутреннего порога (гистерезис), даже если цель ещё жива.
+		var leader := PartySystem.get_active_member()
+		var original_position := companion.global_position
+		PartySystem.set_formation_mode(PartySystem.FormationMode.GATHER)
+		companion.global_position = leader.global_position + Vector3(
+			PlayerConstants.AI_GATHER_COMBAT_LEASH + 0.1, 0.0, 0.0
+		)
+		if not companion._ai_should_regroup():
+			failures.append("режим «Ко мне» не прервал удалённый бой")
+		companion.global_position = leader.global_position + Vector3(
+			PlayerConstants.AI_GATHER_REENGAGE_DISTANCE + 0.1, 0.0, 0.0
+		)
+		if not companion._ai_should_regroup():
+			failures.append("возврат к лидеру сбросился до внутреннего порога")
+		companion.global_position = leader.global_position + Vector3(
+			PlayerConstants.AI_GATHER_REENGAGE_DISTANCE - 0.1, 0.0, 0.0
+		)
+		if companion._ai_should_regroup():
+			failures.append("союзник не вернулся к авто-бою рядом с лидером")
+		companion.global_position = original_position
+		PartySystem.set_formation_mode(PartySystem.FormationMode.FREE)
+
+		# Боевой smoke-тест: боец действительно выбирает цель и наносит урон во всех
+		# режимах. В HOLD дополнительно проверяется граница закреплённого поста.
+		var enemy := Enemy.new()
+		enemy.data = load("res://resources/enemies/goblin.tres") as EnemyData
+		add_child(enemy)
+		for mode in [
+			PartySystem.FormationMode.FREE,
+			PartySystem.FormationMode.GATHER,
+			PartySystem.FormationMode.HOLD,
+		]:
+			PartySystem.set_formation_mode(mode)
+			companion.global_position = leader.global_position + Vector3(1.0, 0.0, 0.0)
+			enemy.global_position = companion.global_position + Vector3(-0.8, 0.0, 0.0)
+			enemy.health = enemy.get_stat_int("max_health")
+			companion.state = Player.State.IDLE
+			companion._attack_timer = 0.0
+			companion._ai_retarget_timer = 0.0
+			companion._ai_cached_target = null
+			var health_before := enemy.health
+			companion._ai_process(PlayerConstants.AI_RETARGET_INTERVAL)
+			if companion._ai_cached_target != enemy:
+				failures.append("союзник не выбрал врага в режиме %d" % mode)
+			if enemy.health >= health_before:
+				failures.append("союзник не атаковал в режиме %d" % mode)
+
+		# Даже если танк успел убежать, центром «Занять позицию» становится лидер,
+		# а не место танка в момент приказа.
+		companion.global_position = leader.global_position + Vector3(
+			PlayerConstants.AI_HOLD_COMBAT_LEASH + 0.1, 0.0, 0.0
+		)
+		PartySystem.set_formation_mode(PartySystem.FormationMode.HOLD)
+		var hold_anchor := PartySystem.hold_position
+		if not hold_anchor.is_equal_approx(leader.global_position):
+			failures.append("центр «Занять позицию» не совпал с позицией лидера")
+		var hold_slot := companion._ai_hold_slot_position()
+		if hold_slot.is_equal_approx(hold_anchor):
+			failures.append("союзник занял центр вместо личной позиции рядом")
+		if hold_slot.distance_to(hold_anchor) >= PlayerConstants.AI_HOLD_COMBAT_LEASH:
+			failures.append("личная позиция союзника вышла за область обороны")
+		enemy.global_position = hold_anchor + Vector3(
+			PlayerConstants.AI_HOLD_COMBAT_LEASH + 0.1, 0.0, 0.0
+		)
+		if companion._ai_find_target() != null:
+			failures.append("HOLD выбрал цель за границей поста")
+		if not companion._ai_should_return_to_hold():
+			failures.append("HOLD не вернул убежавшего союзника к позиции лидера")
+		enemy.queue_free()
+		companion.global_position = original_position
+		companion.state = Player.State.IDLE
+		PartySystem.set_formation_mode(PartySystem.FormationMode.FREE)
+
 		# 3. Доверие в ноль → предаёт или сбегает, покидает отряд.
 		companion.modify_trust(-50)
 		if PartySystem.members.size() != 1:

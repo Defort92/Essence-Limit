@@ -15,6 +15,8 @@
 [ext_resource type="Script" uid="uid://bpugfjvybqdwt" path="res://scripts/systems/ability_manager.gd" id="13"]
 [ext_resource type="Script" uid="uid://b4xvg51jq0vgg" path="res://scripts/components/status_component.gd" id="14"]
 [ext_resource type="Script" uid="uid://pawxjeuuw2x4" path="res://scripts/systems/inventory_system.gd" id="15"]
+[ext_resource type="Resource" path="res://resources/equipment/iron_sword.tres" id="16_sword"]
+[ext_resource type="Script" path="res://scripts/components/directional_equipment_layer.gd" id="17_weapon_layer"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -23,11 +25,19 @@ height = 1.6
 [node name="Player" type="CharacterBody3D" unique_id=438317659]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.0369941, 0)
 collision_layer = 2
+collision_mask = 7
 script = ExtResource("1")
+starting_inventory = Array[Resource]([ExtResource("16_sword")])
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=551735869]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="."]
+path_desired_distance = 0.35
+target_desired_distance = 0.4
+radius = 0.42
+height = 1.8
 
 [node name="Sprite3D" type="Sprite3D" parent="." unique_id=2000712340]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, 0)
@@ -46,6 +56,20 @@ tex_rear_left = ExtResource("8")
 tex_left = ExtResource("9")
 tex_front_left = ExtResource("10")
 frames_dir = "res://assets/sprites/characters/base/frames"
+movement_frames_subdir = "run_v1"
+movement_frames_prefix = "run"
+front_movement_frames_dir = "res://assets/sprites/characters/base/frames/front/run_v10_source_exact"
+front_movement_frames_prefix = "run"
+
+[node name="WeaponSprite3D" type="Sprite3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.96, -0.002)
+pixel_size = 0.015
+billboard = 2
+alpha_cut = 1
+texture_filter = 0
+render_priority = -1
+script = ExtResource("17_weapon_layer")
+source_path = NodePath("../Sprite3D")
 
 [node name="Equipment" type="Node" parent="." unique_id=1984769723]
 script = ExtResource("11")

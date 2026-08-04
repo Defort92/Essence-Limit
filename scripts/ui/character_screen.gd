@@ -10,6 +10,7 @@ extends UIModalScreen
 @onready var _equipment_list: VBoxContainer = $Dim/CenterContainer/Panel/Margin/VBoxContainer/ColumnsRow/EquipmentColumn/ScrollContainer/EquipmentList
 @onready var _inventory_list: VBoxContainer = $Dim/CenterContainer/Panel/Margin/VBoxContainer/ColumnsRow/InventoryColumn/ScrollContainer/InventoryList
 @onready var _essence_list: VBoxContainer = $Dim/CenterContainer/Panel/Margin/VBoxContainer/ColumnsRow/EssenceColumn/ScrollContainer/EssenceList
+@onready var _item_details: ItemDetailsPopup = $ItemDetailsPopup
 
 ## Чьё снаряжение/эссенции сейчас показаны. По умолчанию — активный (управляемый игроком).
 var _target_member: Player = null
@@ -18,6 +19,13 @@ func _ready() -> void:
 	screen_group = "character_screen"
 	close_action = "inventory"
 	super._ready()
+
+func _unhandled_input(event: InputEvent) -> void:
+	if _item_details.visible and (event.is_action_pressed("ui_cancel") or event.is_action_pressed(close_action)):
+		_item_details.close()
+		get_viewport().set_input_as_handled()
+		return
+	super._unhandled_input(event)
 
 ## Клавиша "inventory" при скрытом экране открывает его (экран-переключатель).
 func _on_action_while_hidden() -> void:
@@ -33,6 +41,9 @@ func open(member: Player = null) -> void:
 func _on_state_changed() -> void:
 	if visible:
 		_refresh()
+
+func _before_close() -> void:
+	_item_details.close()
 
 ## Переключает, чьи экипировка/эссенции отображаются. Отписывается от предыдущего
 ## участника и подписывается на нового, чтобы _refresh() шёл на актуальные сигналы.
@@ -94,12 +105,18 @@ func _rebuild_equipment_list() -> void:
 			var cost: int = target_equipment.get_repair_cost(slot)
 			_equipment_list.add_child(UIListRow.create(
 				"%s: %s [сломано]" % [label_name, item.display_name],
-				[{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_slot(slot)}]
+				[
+					{"text": "Подробнее", "callback": func() -> void: _item_details.show_item(item)},
+					{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_slot(slot)},
+				]
 			))
 		else:
 			_equipment_list.add_child(UIListRow.create(
 				"%s: %s" % [label_name, item.display_name],
-				[{"text": "Снять", "callback": func() -> void: target_equipment.unequip_slot(slot)}]
+				[
+					{"text": "Подробнее", "callback": func() -> void: _item_details.show_item(item)},
+					{"text": "Снять", "callback": func() -> void: target_equipment.unequip_slot(slot)},
+				]
 			))
 
 	var accessories: Array[EquipmentData] = target_equipment.get_accessories()
@@ -109,12 +126,18 @@ func _rebuild_equipment_list() -> void:
 			var cost: int = target_equipment.get_accessory_repair_cost(idx)
 			_equipment_list.add_child(UIListRow.create(
 				"Аксессуар: %s [сломано]" % item.display_name,
-				[{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_accessory(idx)}]
+				[
+					{"text": "Подробнее", "callback": func() -> void: _item_details.show_item(item)},
+					{"text": "Починить (%d зол.)" % cost, "callback": func() -> void: target_equipment.repair_accessory(idx)},
+				]
 			))
 		else:
 			_equipment_list.add_child(UIListRow.create(
 				"Аксессуар: %s" % item.display_name,
-				[{"text": "Снять", "callback": func() -> void: target_equipment.unequip_accessory(idx)}]
+				[
+					{"text": "Подробнее", "callback": func() -> void: _item_details.show_item(item)},
+					{"text": "Снять", "callback": func() -> void: target_equipment.unequip_accessory(idx)},
+				]
 			))
 	for _idx in (EquipmentManagerConstants.MAX_ACCESSORIES - accessories.size()):
 		_equipment_list.add_child(UIListRow.create("Аксессуар: пусто"))
@@ -132,6 +155,7 @@ func _rebuild_inventory_list() -> void:
 		var quantity: int = slot.quantity
 		var label_text: String = "%s x%d" % [item.display_name, quantity]
 		var actions: Array = []
+		actions.append({"text": "Подробнее", "callback": func() -> void: _item_details.show_item(item)})
 
 		if item is EquipmentData:
 			actions.append({"text": "Надеть", "callback": func() -> void: target_equipment.equip_from_inventory(item as EquipmentData)})
@@ -144,7 +168,7 @@ func _rebuild_inventory_list() -> void:
 					"callback": func() -> void: _assign_quick_slot(quick_idx, item.id),
 				})
 
-		_inventory_list.add_child(UIListRow.create(label_text, actions))
+		_inventory_list.add_child(UIListRow.create(label_text, actions, item.icon))
 
 func _assign_quick_slot(slot_idx: int, item_id: String) -> void:
 	_target_member.set_quick_slot(slot_idx, item_id)
@@ -166,5 +190,8 @@ func _rebuild_essence_list() -> void:
 		else:
 			_essence_list.add_child(UIListRow.create(
 				"Слот %d: %s" % [idx + 1, slot_essence.display_name],
-				[{"text": "Снять (%d зол.)" % slot_essence.removal_cost, "callback": func() -> void: target_essence.remove(idx)}]
+				[
+					{"text": "Подробнее", "callback": func() -> void: _item_details.show_item(slot_essence)},
+					{"text": "Снять (%d зол.)" % slot_essence.removal_cost, "callback": func() -> void: target_essence.remove(idx)},
+				]
 			))

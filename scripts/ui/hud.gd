@@ -226,7 +226,11 @@ func _update_player_portrait(player: Player) -> void:
 	if _player_portrait_image == null or player == null:
 		return
 	var sprite := player.get_node_or_null("Sprite3D") as DirectionalSprite3D
-	_player_portrait_image.texture = sprite.tex_front if sprite != null else null
+	_player_portrait_image.texture = (
+		PortraitUtils.make_face_texture(sprite.tex_front)
+		if sprite != null
+		else null
+	)
 
 func _on_player_portrait_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

@@ -279,8 +279,8 @@ horizontal_alignment = 1
 layout_mode = 1
 offset_left = 22.0
 offset_top = 104.0
-offset_right = 490.0
-offset_bottom = 240.0
+offset_right = 84.0
+offset_bottom = 520.0
 mouse_filter = 2
 script = ExtResource("5_party")
 
@@ -303,7 +303,7 @@ theme_override_fonts/font = SubResource("FontVariation_hud")
 theme_override_font_sizes/font_size = 12
 text = "ОТРЯД"
 
-[node name="CardsRow" type="HBoxContainer" parent="Control/PartyPanel/Root"]
+[node name="CardsColumn" type="VBoxContainer" parent="Control/PartyPanel/Root"]
 layout_mode = 2
 mouse_filter = 2
-theme_override_constants/separation = 9
+theme_override_constants/separation = 8

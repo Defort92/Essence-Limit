@@ -53,6 +53,7 @@ func _ready() -> void:
 	if data == null:
 		push_error("Enemy '%s': EnemyData не назначен" % name)
 		return
+	_apply_collision_profile()
 	faction = data.faction
 	if _sprite != null:
 		_sprite.set_tint(data.sprite_tint)
@@ -62,6 +63,29 @@ func _ready() -> void:
 	# и проверять is_inside_tree(): периодический тик сам подхватит игрока,
 	# как только тот появится в группе "combatants".
 	_retarget_timer = EnemyConstants.RETARGET_INTERVAL
+
+## Подгоняет физическую капсулу под ресурс конкретного типа врага. Shape дублируется,
+## чтобы изменение гоблина не меняло все экземпляры общей PackedScene одновременно.
+func _apply_collision_profile() -> void:
+	var collision_shape := get_node_or_null("CollisionShape3D") as CollisionShape3D
+	if collision_shape == null or not (collision_shape.shape is CapsuleShape3D):
+		return
+	var capsule := collision_shape.shape.duplicate() as CapsuleShape3D
+	capsule.radius = maxf(data.collision_radius, 0.05)
+	capsule.height = maxf(capsule.height, capsule.radius * 2.0)
+	collision_shape.shape = capsule
+
+func can_be_dodged_through() -> bool:
+	return data != null and data.can_dodge_through
+
+func get_body_mass() -> float:
+	return data.mass if data != null else 70.0
+
+func get_body_size() -> EnemyData.BodySize:
+	return data.body_size if data != null else EnemyData.BodySize.MEDIUM
+
+func get_knockback_resistance() -> float:
+	return data.knockback_resistance if data != null else 0.0
 
 ## Создаёт полоску HP над головой и подписывает её на изменения здоровья.
 func _setup_health_bar() -> void:

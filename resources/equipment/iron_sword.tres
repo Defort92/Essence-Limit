@@ -1,12 +1,14 @@
 [gd_resource type="Resource" format=3]
 
 [ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/icons/items/iron_sword.png" id="2_icon"]
 
 [resource]
 script = ExtResource("1")
 id = "iron_sword"
 display_name = "Железный меч"
 description = "Простой одноручный меч. +5 к урону."
+icon = ExtResource("2_icon")
 rarity = 0
 buy_price = 50
 sell_price = 15
@@ -14,6 +16,7 @@ is_stackable = false
 max_stack = 1
 slot = 4
 weapon_type = 1
+sprite_frames_dir = "res://assets/sprites/equipment/iron_sword/frames"
 stat_bonuses = {
 "damage": 5
 }

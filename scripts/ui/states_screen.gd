@@ -25,6 +25,7 @@ func _ready() -> void:
 	# HUD, где C переключает свёрнутую панель состояний.
 	screen_group = "states_screen"
 	close_action = "states"
+	pauses_game = true
 	super._ready()
 	_build_icon_styles()
 

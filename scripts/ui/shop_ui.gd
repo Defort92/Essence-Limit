@@ -1,6 +1,6 @@
 ## Оверлей лавки: покупка у торговца и продажа предметов из рюкзака.
 ## Открывается вызовом open(vendor) — вызывается NPC-торговцем (см. vendor_npc.gd)
-## через группу "shop_ui". Каркас модалки (пауза, закрытие крестиком/ESC) — в UIModalScreen.
+## через группу "shop_ui". Каркас модалки (блокировка управления, закрытие крестиком/ESC) — в UIModalScreen.
 extends UIModalScreen
 
 @onready var _vendor_name_label: Label = $Dim/CenterContainer/Panel/Margin/VBoxContainer/HeaderRow/VendorNameLabel
@@ -16,7 +16,7 @@ func _ready() -> void:
 	ShopSystem.item_bought.connect(func(_v, _i, _q) -> void: _refresh())
 	ShopSystem.item_sold.connect(func(_i, _q) -> void: _refresh())
 
-## Открывает лавку [param vendor] и ставит игру на паузу.
+## Открывает лавку [param vendor], не останавливая мир.
 func open(vendor: VendorData) -> void:
 	_current_vendor = vendor
 	_vendor_name_label.text = vendor.display_name
@@ -39,7 +39,8 @@ func _rebuild_buy_list() -> void:
 	for item: ItemData in _current_vendor.stock:
 		_buy_list.add_child(UIListRow.create(
 			"%s — %d зол." % [item.display_name, item.buy_price],
-			[{"text": "Купить", "callback": func() -> void: ShopSystem.buy(_current_vendor, item, 1)}]
+			[{"text": "Купить", "callback": func() -> void: ShopSystem.buy(_current_vendor, item, 1)}],
+			item.icon
 		))
 
 func _rebuild_sell_list() -> void:
@@ -54,5 +55,6 @@ func _rebuild_sell_list() -> void:
 			continue
 		_sell_list.add_child(UIListRow.create(
 			"%s x%d — %d зол." % [item.display_name, slot.quantity, item.sell_price],
-			[{"text": "Продать", "callback": func() -> void: ShopSystem.sell(item, 1)}]
+			[{"text": "Продать", "callback": func() -> void: ShopSystem.sell(item, 1)}],
+			item.icon
 		))

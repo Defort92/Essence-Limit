@@ -1,6 +1,6 @@
 ## Экран обыска тела: список предметов павшего (врага или союзника) с кнопками «Взять».
 ## Открывается LootableCorpse через группу "loot_ui" по клавише "interact" (F).
-## Каркас модалки (пауза, блюр, закрытие по клавише/крестику/фону/ESC) — в UIModalScreen.
+## Каркас модалки (блюр, блокировка управления, закрытие по клавише/крестику/фону/ESC) — в UIModalScreen.
 ## Один и тот же экран для врагов и союзников — источник (LootableCorpse) скрывает разницу.
 extends UIModalScreen
 
@@ -16,7 +16,16 @@ func _ready() -> void:
 	close_action = "interact"
 	super._ready()
 
-## Открывает обыск тела [param source] и ставит игру на паузу.
+## Горячая клавиша «Взять всё» работает только пока открыт экран лута.
+## Само действие доступно для переназначения в меню настроек управления.
+func _unhandled_input(event: InputEvent) -> void:
+	if visible and event.is_action_pressed("take_all_loot"):
+		_on_take_all_pressed()
+		get_viewport().set_input_as_handled()
+		return
+	super._unhandled_input(event)
+
+## Открывает обыск тела [param source]. Мир продолжает работать, ввод персонажа блокируется.
 func open(source: LootableCorpse) -> void:
 	_source = source
 	if not source.loot_changed.is_connected(_on_source_changed):

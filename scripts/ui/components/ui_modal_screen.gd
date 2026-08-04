@@ -4,8 +4,8 @@
 ##  - работа всегда (PROCESS_MODE_ALWAYS) — и на паузе (чтобы закрытие/крестик/фон работали,
 ##    пока сам экран держит игру на паузе), и без неё (чтобы клавиша-открывашка вроде
 ##    "inventory" срабатывала из обычной игры, а не только когда пауза уже включена извне);
-##  - пауза при открытии (_show_modal) и снятие при закрытии (close);
-##  - синхронизация с внешним снятием паузы (ESC через PauseManager);
+##  - опциональная пауза при открытии (_show_modal) и снятие при закрытии (close);
+##  - закрытие непаусящего окна при внешней паузе и паусящего — при снятии паузы;
 ##  - закрытие по клавише close_action, крестику (_on_close_pressed) и клику по фону
 ##    (_on_backdrop_input — подключается в сцене от узла Backdrop, если он есть).
 ##
@@ -19,6 +19,12 @@ class_name UIModalScreen
 var screen_group: String = ""
 ## Input-действие, закрывающее видимый экран ("" — закрытие только ESC/крестиком/фоном).
 var close_action: String = ""
+## Обычные игровые окна не останавливают мир. Включается только для экранов, которым
+## действительно нужна пауза (сейчас — окно состояний).
+var pauses_game: bool = false
+## Кадр закрытия тоже блокирует игровой ввод, чтобы клавиша окна не запускала заодно
+## уклонение, атаку или другое действие персонажа.
+var _gameplay_input_blocked_through_frame: int = -1
 
 func _ready() -> void:
 	if not screen_group.is_empty():
@@ -26,8 +32,8 @@ func _ready() -> void:
 	add_to_group("modal_screen")
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	hide()
-	# ESC снимает паузу через PauseManager напрямую (не через close()) — синхронизируемся,
-	# чтобы панель не осталась висеть поверх разблокированного мира.
+	PauseManager.paused.connect(_on_external_pause)
+	# ESC снимает паузу через PauseManager напрямую (не через close()) — синхронизируемся.
 	PauseManager.unpaused.connect(_on_external_unpause)
 
 func _unhandled_input(event: InputEvent) -> void:
@@ -37,8 +43,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		close()
 		get_viewport().set_input_as_handled()
 	elif not PauseManager.is_paused:
-		# Игра уже на паузе (меню паузы, лавка, другой модальный экран — любой из них ставит
-		# is_paused через _show_modal) — не открываемся поверх, чтобы не плодить наложенные окна.
+		# Во время паузы не открываем новый игровой экран поверх меню или паусящей модалки.
 		_on_action_while_hidden()
 
 ## Клавиша close_action нажата, когда экран скрыт и игра не на паузе (см. выше). По умолчанию
@@ -47,21 +52,37 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_action_while_hidden() -> void:
 	pass
 
-## Показывает экран и ставит игру на паузу. Вызывается из open(...) подкласса.
+## Показывает экран и, если запрошено подклассом, ставит игру на паузу.
 func _show_modal() -> void:
 	show()
-	PauseManager.pause()
+	if pauses_game:
+		PauseManager.pause()
 
-## Закрывает экран и снимает паузу.
+## Закрывает экран и снимает только ту паузу, которую этот экран сам использует.
 func close() -> void:
+	_gameplay_input_blocked_through_frame = Engine.get_process_frames() + 1
 	_before_close()
 	hide()
-	PauseManager.unpause()
+	if pauses_game and PauseManager.is_paused:
+		PauseManager.unpause()
+
+## Пока окно видно (и в кадре его закрытия), персонаж не получает команды сквозь UI.
+func is_gameplay_input_blocking() -> bool:
+	return visible or Engine.get_process_frames() <= _gameplay_input_blocked_through_frame
+
+## При Esc непаусящее окно закрывается, а обычная пауза остаётся включённой.
+func _on_external_pause() -> void:
+	if not visible or pauses_game:
+		return
+	_gameplay_input_blocked_through_frame = Engine.get_process_frames() + 1
+	_before_close()
+	hide()
 
 ## Пауза снята извне (ESC) — прячемся с той же очисткой, что и при обычном закрытии.
 func _on_external_unpause() -> void:
-	if not visible:
+	if not visible or not pauses_game:
 		return
+	_gameplay_input_blocked_through_frame = Engine.get_process_frames() + 1
 	_before_close()
 	hide()
 

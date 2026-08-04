@@ -27,9 +27,20 @@ class_name DirectionalSprite3D
 ## Каталог с покадровой анимацией. Пусто — статичный режим (враги). Внутри ожидаются
 ## подпапки по именам ракурсов (см. DIR_FOLDERS), в каждой — кадры idle_01.png…, walk_01.png…
 @export_dir var frames_dir: String = ""
+## Optional subfolder with a movement series for every direction (for example, run_v1/run_NN.png).
+## If a direction has no such series, its walk_NN.png frames are used as a fallback.
+@export var movement_frames_subdir: String = ""
+@export var movement_frames_prefix: String = "walk"
+## Optional replacement for the front-facing movement series. This allows the front
+## direction to use a separately selected cycle while the other directions use the subfolder above.
+@export_dir var front_movement_frames_dir: String = ""
+@export var front_movement_frames_prefix: String = "walk"
 ## Кадров в секунду для анимаций покоя и ходьбы.
 @export var idle_fps: float = 6.0
 @export var walk_fps: float = 10.0
+## Переиспользует правые кадры для трёх симметричных левых секторов.
+## Статичные текстуры остаются уникальными; зеркалятся только серии анимации.
+@export var mirror_left_animations := true
 
 
 var _textures: Array[Texture2D] = []
@@ -39,6 +50,7 @@ var _current_index: int = -1
 ## Пусты в статичном режиме.
 var _idle_frames: Array = []
 var _walk_frames: Array = []
+var _animation_flip_h: Array[bool] = []
 ## true — загружена хотя бы одна серия кадров, спрайт работает в анимированном режиме.
 var _has_animation: bool = false
 ## true — проигрывается анимация ходьбы, false — покоя. Ставится игроком через set_moving().
@@ -51,6 +63,11 @@ var _frame_timer: float = 0.0
 ## подсвеченный (красный) цвет как базовый — и спрайт «застревал» бы в нём.
 var _base_modulate: Color = Color.WHITE
 var _flash_tween: Tween = null
+
+## Ресурсный кэш живёт вместе с class_name-скриптом, а не с конкретной сценой.
+## Без сильных ссылок все 60 кадров игрока освобождались при смене локации и
+## синхронно читались заново в _ready() следующего Player.
+static var _shared_animation_cache: Dictionary = {}
 
 func _ready() -> void:
 	_textures = [
@@ -67,16 +84,70 @@ func _ready() -> void:
 ## Грузит серии кадров idle/walk для всех 8 ракурсов из frames_dir. Отсутствие какой-то
 ## серии не ошибка — на этот ракурс останется откат к статике/другой серии.
 func _load_animation_frames() -> void:
+	var cache_key := "%s|movement_subdir=%s|movement_prefix=%s|front_movement=%s|front_prefix=%s|mirror=%s" % [
+		frames_dir,
+		movement_frames_subdir,
+		movement_frames_prefix,
+		front_movement_frames_dir,
+		front_movement_frames_prefix,
+		str(mirror_left_animations),
+	]
+	var cached: Variant = _shared_animation_cache.get(cache_key)
+	if cached is Dictionary:
+		_idle_frames = cached["idle_frames"]
+		_walk_frames = cached["walk_frames"]
+		_animation_flip_h = cached["flip_h"]
+		_has_animation = bool(cached["has_animation"])
+		return
+
 	_idle_frames.resize(8)
 	_walk_frames.resize(8)
+	_animation_flip_h.resize(8)
+	var loaded_idle_by_source: Dictionary = {}
+	var loaded_walk_by_source: Dictionary = {}
 	for sector in 8:
-		var dir_path: String = frames_dir.path_join(DirectionalSpriteConstants.DIR_FOLDERS[sector])
-		var idle_series: Array[Texture2D] = _load_series(dir_path, "idle")
-		var walk_series: Array[Texture2D] = _load_series(dir_path, "walk")
+		var source_sector := sector
+		var mirror_source := DirectionalSpriteConstants.MIRROR_SOURCE_SECTORS[sector]
+		if mirror_left_animations and mirror_source >= 0:
+			source_sector = mirror_source
+			_animation_flip_h[sector] = true
+		else:
+			_animation_flip_h[sector] = false
+		var idle_series: Array[Texture2D]
+		var walk_series: Array[Texture2D]
+		if loaded_idle_by_source.has(source_sector):
+			idle_series = loaded_idle_by_source[source_sector]
+			walk_series = loaded_walk_by_source[source_sector]
+		else:
+			var dir_path: String = frames_dir.path_join(
+				DirectionalSpriteConstants.DIR_FOLDERS[source_sector]
+			)
+			idle_series = _load_series(dir_path, "idle")
+			if source_sector == 0 and not front_movement_frames_dir.is_empty():
+				walk_series = _load_series(
+					front_movement_frames_dir,
+					front_movement_frames_prefix
+				)
+			elif not movement_frames_subdir.is_empty():
+				walk_series = _load_series(
+					dir_path.path_join(movement_frames_subdir),
+					movement_frames_prefix
+				)
+			if walk_series.is_empty():
+				walk_series = _load_series(dir_path, "walk")
+			loaded_idle_by_source[source_sector] = idle_series
+			loaded_walk_by_source[source_sector] = walk_series
 		_idle_frames[sector] = idle_series
 		_walk_frames[sector] = walk_series
 		if not idle_series.is_empty() or not walk_series.is_empty():
 			_has_animation = true
+
+	_shared_animation_cache[cache_key] = {
+		"idle_frames": _idle_frames,
+		"walk_frames": _walk_frames,
+		"flip_h": _animation_flip_h,
+		"has_animation": _has_animation,
+	}
 
 ## Грузит нумерованную серию кадров prefix_01.png, prefix_02.png … из каталога [param dir_path],
 ## пока файлы существуют. Возвращает пустой массив, если ни одного кадра нет.
@@ -118,6 +189,11 @@ func _apply_index(index: int) -> void:
 	if index == _current_index:
 		return
 	_current_index = index
+	flip_h = (
+		_animation_flip_h[index]
+		if _has_animation and index < _animation_flip_h.size()
+		else false
+	)
 	# В статичном режиме текстуру ставим прямо на смене ракурса; в анимированном её каждый
 	# кадр обновляет _process по текущей серии.
 	if not _has_animation and index < _textures.size() and _textures[index] != null:
@@ -145,6 +221,35 @@ func _current_frames() -> Array[Texture2D]:
 	if not primary.is_empty():
 		return primary
 	return _idle_frames[_current_index] if _is_moving else _walk_frames[_current_index]
+
+
+## Диагностика для автоматической проверки анимаций и инструментов.
+func get_animation_frame_count(sector: int, moving: bool) -> int:
+	if sector < 0 or sector >= 8:
+		return 0
+	var series: Array[Texture2D] = _walk_frames[sector] if moving else _idle_frames[sector]
+	return series.size()
+
+
+func is_animation_sector_mirrored(sector: int) -> bool:
+	return (
+		sector >= 0
+		and sector < _animation_flip_h.size()
+		and _animation_flip_h[sector]
+	)
+
+
+## Текущее состояние нужно синхронным слоям экипировки, которые используют те же кадры.
+func get_current_sector() -> int:
+	return _current_index
+
+
+func get_current_animation_frame() -> int:
+	return _frame_index
+
+
+func is_moving_animation() -> bool:
+	return _is_moving
 
 ## Устанавливает базовый оттенок спрайта (расовый/монстровый). Вспышки возвращаются
 ## именно к нему. Вызывай вместо прямого присваивания modulate для стойкого цвета.
