@@ -72,6 +72,12 @@ uniform float wrap : hint_range(-2.0f, 2.0f) = 0.0f; // Bias lighting
 uniform float steepness : hint_range(1.0f, 8.0f) = 1.0f; // Steepness of lighting
 uniform float threshold_gradient_size = 0.2; // Hybrid toon shading control (set to 0 for standard toon shading)
 
+// Optional marker for screen-space effects that need to identify and skip
+// grass pixels. Disabled by default so existing game materials keep their
+// current behaviour; the visual-style laboratory enables it explicitly.
+uniform bool outline_exclusion_enabled = false;
+uniform float outline_exclusion_marker : hint_range(0.01, 0.99, 0.001) = 0.123;
+
 varying float debug_wind_color;
 varying vec3 debug_interactive_color;
 varying float wind_noise_sample;
@@ -320,6 +326,9 @@ void fragment() {
 	LIGHT_VERTEX = model_origin;
 	ALPHA = albedo_tex.a;
 	ALPHA_SCISSOR_THRESHOLD = 1.0;
+	if (outline_exclusion_enabled) {
+		ROUGHNESS = outline_exclusion_marker;
+	}
 	//ALBEDO = vec3(UV.y);
 	if (debug_noise) {
 		ALBEDO = vec3(debug_wind_color);

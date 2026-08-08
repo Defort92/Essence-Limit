@@ -1,9 +1,6 @@
 extends SceneTree
 
 const BODY_FRAMES := "res://assets/sprites/characters/base/frames"
-const FRONT_RUN_FRAMES := (
-	"res://assets/sprites/characters/base/frames/front/run_v10_source_exact"
-)
 const SWORD_FRAMES := "res://assets/sprites/equipment/iron_sword/frames"
 const EQUIPMENT_LAYER_SCRIPT := preload(
 	"res://scripts/components/directional_equipment_layer.gd"
@@ -23,10 +20,6 @@ func _initialize() -> void:
 func _run_test() -> void:
 	var body := DirectionalSprite3D.new()
 	body.frames_dir = BODY_FRAMES
-	body.movement_frames_subdir = "run_v1"
-	body.movement_frames_prefix = "run"
-	body.front_movement_frames_dir = FRONT_RUN_FRAMES
-	body.front_movement_frames_prefix = "run"
 	root.add_child(body)
 
 	var sword := EQUIPMENT_LAYER_SCRIPT.new()
@@ -57,6 +50,19 @@ func _run_test() -> void:
 			push_error("Sword mirror mismatch in sector %d." % sector)
 			quit(1)
 			return
+
+	body.face_direction(DIRECTIONS[4])
+	body.set_moving(false)
+	body._process(
+		body.get_idle_pause_remaining()
+		+ body.idle_frame_duration * 5.0
+		+ 0.001
+	)
+	sword._process(0.0)
+	if not sword.texture.resource_path.ends_with("/back/idle/default/frame_04.png"):
+		push_error("Sword idle phase did not scale from 6 body frames to 4 equipment frames.")
+		quit(1)
+		return
 
 	sword.set_frames_dir("")
 	if sword.visible or sword.texture != null:

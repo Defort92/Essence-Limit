@@ -8,6 +8,9 @@
 extends CharacterBody3D
 class_name Player
 
+const COMBAT_PROJECTILE_SCENE := preload("res://scenes/effects/combat_projectile.tscn")
+const CombatProjectileScript := preload("res://scripts/entities/combat_projectile.gd")
+
 
 enum State { IDLE, MOVE, DODGE, ATTACK, DEAD }
 var state: State = State.IDLE
@@ -58,6 +61,7 @@ var _is_fleeing: bool = false
 @onready var inventory: InventoryComponent = $Inventory
 @onready var _nav_agent: NavigationAgent3D = get_node_or_null("NavigationAgent3D") as NavigationAgent3D
 @onready var _weapon_sprite = $WeaponSprite3D
+@onready var _target_indicator: TargetIndicator = $TargetIndicator
 
 var _dodge_timer: float = 0.0
 var _dodge_direction: Vector3 = Vector3.ZERO
@@ -66,6 +70,9 @@ var _dodge_distance_remaining: float = 0.0
 var _dodge_last_safe_position: Vector3 = Vector3.ZERO
 var _dodge_collision_exceptions: Array[CollisionObject3D] = []
 var _last_move_dir: Vector3 = Vector3.BACK
+## Враг, к экранной позиции которого сейчас прилип курсор. Используется меткой,
+## разворотом стоящего персонажа и дальними/магическими атаками.
+var _aim_target: Node3D = null
 ## Короткий внешний импульс только для AI-союзника, которому активный персонаж физически
 ## перекрыл путь. Это не боевое отбрасывание и никогда не применяется к врагам.
 var _ally_soft_push_velocity: Vector3 = Vector3.ZERO
@@ -154,6 +161,7 @@ func _physics_process(delta: float) -> void:
 					_stop_horizontal()
 				else:
 					_handle_movement(delta)
+					_update_aim_target()
 					_handle_attack_input()
 					_handle_block_input()
 					_handle_dodge_input()
@@ -169,6 +177,7 @@ func _physics_process(delta: float) -> void:
 					_stop_horizontal()
 				else:
 					_handle_movement(delta)
+					_update_aim_target()
 					_handle_block_input()
 			else:
 				# ИИ во время замаха стоит на месте, плавно гася инерцию, — иначе союзник
@@ -447,7 +456,7 @@ func _tick_attack_state(delta: float) -> void:
 
 func _perform_attack() -> void:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
-	if weapon != null and weapon.weapon_type == EquipmentData.WeaponType.RANGED:
+	if _is_projectile_weapon(weapon):
 		_perform_ranged_attack(weapon)
 	else:
 		_perform_melee_attack()
@@ -470,22 +479,42 @@ func _perform_melee_attack() -> void:
 		target.take_damage(CombatMath.apply_crit(atk_damage) if is_crit else atk_damage, is_crit)
 
 func _perform_ranged_attack(weapon: EquipmentData) -> void:
-	# Временная реализация: мгновенный хит ближайшего врага в радиусе.
-	# Заменить на ProjectileComponent когда добавится визуал.
 	var atk_range: float = float(weapon.stat_bonuses.get("range", 10.0))
-	var atk_damage := _get_attack_damage()
-	var nearest_target: Node3D = null
-	var nearest_dist: float = atk_range
-	for target in get_tree().get_nodes_in_group("combatants"):
-		if not _is_hostile_target(target):
-			continue
-		var dist: float = global_position.distance_to(target.global_position)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest_target = target
-	if nearest_target != null:
-		var is_crit: bool = CombatMath.roll_crit(self, nearest_target)
-		nearest_target.take_damage(CombatMath.apply_crit(atk_damage) if is_crit else atk_damage, is_crit)
+	if not _is_valid_aim_target(_aim_target, atk_range):
+		return
+	var projectile := COMBAT_PROJECTILE_SCENE.instantiate() as CharacterBody3D
+	var kind := (
+		CombatProjectileScript.Kind.FIREBALL
+		if weapon.weapon_type == EquipmentData.WeaponType.MAGIC
+		else CombatProjectileScript.Kind.ARROW
+	)
+	var default_speed := (
+		CombatProjectileScript.FIREBALL_SPEED
+		if kind == CombatProjectileScript.Kind.FIREBALL
+		else CombatProjectileScript.ARROW_SPEED
+	)
+	var target_position := (
+		_aim_target.global_position
+		+ Vector3.UP * PlayerConstants.AIM_TARGET_HEIGHT
+	)
+	var spawn_position := global_position + Vector3.UP * PlayerConstants.PROJECTILE_SPAWN_HEIGHT
+	var shot_direction := (target_position - spawn_position).normalized()
+	projectile.configure(
+		self,
+		_get_attack_damage(),
+		shot_direction,
+		float(weapon.stat_bonuses.get("projectile_speed", default_speed)),
+		atk_range,
+		kind
+	)
+	var projectile_parent: Node = get_tree().current_scene
+	if projectile_parent == null:
+		projectile_parent = get_parent()
+	projectile_parent.add_child(projectile)
+	projectile.global_position = (
+		spawn_position
+		+ shot_direction * PlayerConstants.PROJECTILE_SPAWN_FORWARD_OFFSET
+	)
 
 ## true если [param target] — живой узел из группы "combatants" враждебной по фракции.
 func _is_hostile_target(target: Node) -> bool:
@@ -502,6 +531,10 @@ func _get_attack_damage() -> int:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
 	if weapon != null:
 		var weapon_damage: int = weapon.stat_bonuses.get("damage", 0)
+		if weapon.weapon_type == EquipmentData.WeaponType.MAGIC:
+			return weapon_damage + int(float(get_total_stat("intellect")) / 2.0)
+		if weapon.weapon_type == EquipmentData.WeaponType.RANGED:
+			return weapon_damage + int(float(get_total_stat("agility")) / 2.0)
 		return weapon_damage + int(float(get_total_stat("strength")) / 2.0)
 	return maxi(
 		1,
@@ -516,6 +549,7 @@ func _get_attack_cooldown() -> float:
 		EquipmentData.WeaponType.MELEE_ONE_HAND: return 0.5
 		EquipmentData.WeaponType.MELEE_TWO_HAND: return 0.9
 		EquipmentData.WeaponType.RANGED:         return 0.7
+		EquipmentData.WeaponType.MAGIC:          return 0.85
 	return PlayerConstants.UNARMED_COOLDOWN
 
 func _get_attack_range() -> float:
@@ -523,6 +557,79 @@ func _get_attack_range() -> float:
 	if weapon != null:
 		return float(weapon.stat_bonuses.get("range", 1.5))
 	return PlayerConstants.UNARMED_RANGE
+
+func _is_projectile_weapon(weapon: EquipmentData) -> bool:
+	return (
+		weapon != null
+		and weapon.weapon_type in [
+			EquipmentData.WeaponType.RANGED,
+			EquipmentData.WeaponType.MAGIC,
+		]
+	)
+
+## Ищет врага около курсора в экранных координатах. Это делает помощь одинаковой
+## при любом наклоне/удалении камеры и не превращает её в автонаведение на ближайшего.
+func _update_aim_target() -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		_set_aim_target(null)
+		return
+	var max_range := _get_attack_range()
+	var mouse_position := get_viewport().get_mouse_position()
+	var best_target: Node3D = null
+	var best_score := PlayerConstants.AIM_ASSIST_RADIUS_PX
+	for candidate in get_tree().get_nodes_in_group("combatants"):
+		if not (candidate is Node3D) or not _is_valid_aim_target(candidate, max_range):
+			continue
+		var candidate_3d := candidate as Node3D
+		var aim_position := candidate_3d.global_position + Vector3.UP * PlayerConstants.AIM_TARGET_HEIGHT
+		if camera.is_position_behind(aim_position):
+			continue
+		var screen_distance := mouse_position.distance_to(camera.unproject_position(aim_position))
+		var score := screen_distance
+		if candidate_3d == _aim_target:
+			score -= PlayerConstants.AIM_ASSIST_STICKY_BONUS_PX
+		if score < best_score:
+			best_score = score
+			best_target = candidate_3d
+	_set_aim_target(best_target)
+
+	# Движение всегда важнее боевой фиксации: во время бега персонаж смотрит по ходу.
+	var horizontal_speed_sq := velocity.x * velocity.x + velocity.z * velocity.z
+	if horizontal_speed_sq > PlayerConstants.MOVE_ANIM_THRESHOLD_SQ:
+		return
+	if _aim_target != null:
+		var to_target := _aim_target.global_position - global_position
+		to_target.y = 0.0
+		if to_target.length_squared() > 0.001:
+			_last_move_dir = to_target.normalized()
+		return
+	# С дальним оружием без захваченной цели всё равно смотрим в точку под курсором:
+	# выстрел уходит в выбранном мышью направлении, но никого не задевает.
+	if _is_projectile_weapon(equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)):
+		var mouse_ground := _mouse_ground_point()
+		if mouse_ground != Vector3.INF:
+			var to_mouse := mouse_ground - global_position
+			to_mouse.y = 0.0
+			if to_mouse.length_squared() > 0.001:
+				_last_move_dir = to_mouse.normalized()
+
+func _is_valid_aim_target(target: Node3D, max_range: float) -> bool:
+	return (
+		target != null
+		and is_instance_valid(target)
+		and _is_hostile_target(target)
+		and global_position.distance_to(target.global_position) <= max_range
+	)
+
+func _set_aim_target(target: Node3D) -> void:
+	_aim_target = target
+	if _target_indicator == null:
+		return
+	if target == null:
+		_target_indicator.clear_target()
+	else:
+		_target_indicator.show_target(target)
 
 ## Унифицированный физический профиль для будущих способностей отбрасывания.
 ## Обычное движение намеренно не вызывает боевой толчок.
@@ -781,6 +888,7 @@ func set_control_mode(mode: ControlMode) -> void:
 			add_to_group("player")
 	else:
 		_has_move_target = false  # цель бега мышью актуальна только для управляемого игроком
+		_set_aim_target(null)
 		if is_in_group("player"):
 			remove_from_group("player")
 
@@ -1153,7 +1261,7 @@ func _get_heal_power() -> int:
 ## true если в основной руке дальнобойное оружие — тогда ИИ держит дистанцию вместо сближения.
 func _ai_is_ranged_role() -> bool:
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
-	return weapon != null and weapon.weapon_type == EquipmentData.WeaponType.RANGED
+	return _is_projectile_weapon(weapon)
 
 ## Вне боя союзник держится рядом с активным (управляемым игроком) персонажем отряда,
 ## со смещением по формации — иначе все союзники сойдутся в одну точку и будут толкаться.
@@ -1537,6 +1645,7 @@ func _init_from_roster() -> void:
 	var inventory_data: Array = entry.get("inventory", [])
 	if not inventory_data.is_empty():
 		inventory.deserialize(inventory_data)
+	equipment.normalize_loaded_hands()
 
 	essence.bonus_slots = int(entry.get("essence_bonus_slots", 0))
 	essence.resize_to_level(XPSystem.current_level)

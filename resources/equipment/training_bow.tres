@@ -1,0 +1,23 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/icons/items/training_bow.svg" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "training_bow"
+display_name = "Учебный лук"
+description = "Простой двуручный лук для проверки дальнего боя. Урон зависит от ловкости."
+icon = ExtResource("2")
+rarity = 0
+buy_price = 35
+sell_price = 10
+is_stackable = false
+max_stack = 1
+slot = 4
+weapon_type = 3
+stat_bonuses = {
+"damage": 4,
+"projectile_speed": 30.0,
+"range": 11.0
+}

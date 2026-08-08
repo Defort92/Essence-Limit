@@ -138,6 +138,14 @@ func get_loot_entries() -> Array:
 		var eq: EquipmentManager = source_player.equipment
 		for slot: EquipmentData.Slot in LootableCorpseConstants.ARMOR_SLOTS:
 			var item: EquipmentData = eq.get_equipped(slot)
+			# Вторая рука двуручного оружия — виртуальная занятость, а не
+			# второй экземпляр предмета, поэтому в лут её не дублируем.
+			if (
+				slot == EquipmentData.Slot.WEAPON_OFF
+				and item != null
+				and item.is_two_handed_weapon()
+			):
+				continue
 			if item != null:
 				var label: String = LootableCorpseConstants.SLOT_NAMES.get(slot, "?")
 				entries.append({

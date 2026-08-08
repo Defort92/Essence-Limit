@@ -17,41 +17,41 @@ PREVIEW_PATH = EQUIPMENT_ROOT / "iron_sword_animation_preview.png"
 DIRECTIONS = ("front", "front-right", "full-right", "rear-right", "back")
 
 # Attachment point of the character's weapon hand in each 128x128 source frame.
-# Angles are measured from a blade pointing straight down; negative angles trail left.
+# The master points down: about -135 degrees raises the tip up-left, +135 up-right.
 POSES: dict[str, dict[str, list[tuple[int, int, float]]]] = {
     "front": {
-        "idle": [(41, 81, -18), (40, 80, -18), (41, 79, -18), (40, 80, -18)],
+        "idle": [(41, 81, -48), (40, 80, -46), (41, 79, -50), (40, 80, -47)],
         "run": [
-            (48, 56, -38), (48, 72, -24), (50, 56, -38), (55, 51, -42),
-            (42, 67, -30), (48, 70, -25), (48, 65, -30), (54, 51, -42),
+            (48, 56, -140), (48, 72, -132), (50, 56, -145), (55, 51, -136),
+            (42, 67, -128), (48, 70, -134), (48, 65, -142), (54, 51, -136),
         ],
     },
     "front-right": {
-        "idle": [(43, 79, -28), (43, 78, -28), (43, 77, -28), (43, 78, -28)],
+        "idle": [(43, 79, -54), (43, 78, -51), (43, 77, -56), (43, 78, -53)],
         "run": [
-            (42, 70, -42), (51, 65, -38), (43, 70, -42), (55, 53, -48),
-            (41, 70, -42), (50, 58, -44), (42, 69, -42), (54, 54, -48),
+            (42, 70, 132), (51, 65, 139), (43, 70, 135), (55, 53, 145),
+            (41, 70, 128), (50, 58, 141), (42, 69, 134), (54, 54, 144),
         ],
     },
     "full-right": {
-        "idle": [(58, 79, -25), (58, 78, -25), (58, 77, -25), (58, 78, -25)],
+        "idle": [(58, 79, -46), (58, 78, -43), (58, 77, -48), (58, 78, -45)],
         "run": [
-            (82, 58, -48), (68, 64, -42), (83, 59, -48), (76, 55, -46),
-            (81, 58, -48), (67, 64, -42), (82, 59, -48), (76, 55, -46),
+            (58, 65, 132), (61, 64, 138), (60, 62, 142), (61, 58, 136),
+            (58, 65, 128), (63, 64, 137), (60, 61, 144), (61, 58, 135),
         ],
     },
     "rear-right": {
-        "idle": [(85, 80, 22), (85, 79, 22), (85, 78, 22), (85, 79, 22)],
+        "idle": [(85, 80, 47), (85, 79, 44), (85, 78, 49), (85, 79, 46)],
         "run": [
-            (85, 59, 36), (84, 59, 34), (86, 62, 32), (82, 55, 38),
-            (85, 60, 34), (86, 59, 36), (85, 62, 32), (83, 56, 38),
+            (85, 59, 136), (84, 59, 142), (86, 62, 132), (82, 55, 145),
+            (85, 60, 134), (86, 59, 140), (85, 62, 130), (83, 56, 144),
         ],
     },
     "back": {
-        "idle": [(87, 81, 18), (87, 80, 18), (87, 79, 18), (87, 80, 18)],
+        "idle": [(87, 81, 45), (87, 80, 42), (87, 79, 47), (87, 80, 44)],
         "run": [
-            (87, 54, 34), (84, 63, 28), (88, 63, 28), (83, 53, 36),
-            (87, 57, 32), (86, 61, 30), (88, 64, 28), (84, 53, 36),
+            (87, 54, 138), (84, 63, 132), (88, 63, 135), (83, 53, 145),
+            (87, 57, 136), (86, 61, 130), (88, 64, 134), (84, 53, 143),
         ],
     },
 }
@@ -71,18 +71,15 @@ def _make_layer(master: Image.Image, pose: tuple[int, int, float]) -> Image.Imag
     rotated = _rotated_weapon(master, angle)
     layer = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
     layer.alpha_composite(rotated, (hand_x - 64, hand_y - 64))
+    # The body sprite remains visible through this small opening, so the glove
+    # closes around the grip instead of the weapon looking pasted over the hand.
+    draw = ImageDraw.Draw(layer)
+    draw.rectangle((hand_x - 2, hand_y - 3, hand_x + 2, hand_y + 2), fill=(0, 0, 0, 0))
     return layer
 
 
 def _base_frame_path(direction: str, animation: str, index: int) -> Path:
-    if animation == "idle":
-        return BASE_FRAMES / direction / f"idle_{index:02}.png"
-    run_dir = (
-        BASE_FRAMES / direction / "run_v10_source_exact"
-        if direction == "front"
-        else BASE_FRAMES / direction / "run_v1"
-    )
-    return run_dir / f"run_{index:02}.png"
+    return BASE_FRAMES / direction / animation / "default" / f"frame_{index:02}.png"
 
 
 def build() -> None:
@@ -90,7 +87,7 @@ def build() -> None:
     if master.getbbox() is None:
         raise ValueError(f"Weapon master has no visible pixels: {MASTER_PATH}")
 
-    # Keep Godot's sibling .import files intact on rebuild; frame names are stable.
+    # Keep Godot's sibling .import files intact; regenerated frame paths are stable.
     OUTPUT_FRAMES.mkdir(parents=True, exist_ok=True)
     for old_frame in OUTPUT_FRAMES.rglob("*.png"):
         old_frame.unlink()
@@ -106,14 +103,14 @@ def build() -> None:
         )
         column = 0
         for animation, poses in POSES[direction].items():
-            output_dir = OUTPUT_FRAMES / direction
+            output_dir = OUTPUT_FRAMES / direction / animation / "default"
             output_dir.mkdir(parents=True, exist_ok=True)
             for index, pose in enumerate(poses, start=1):
                 layer = _make_layer(master, pose)
-                layer.save(output_dir / f"{animation}_{index:02}.png", optimize=True)
+                layer.save(output_dir / f"frame_{index:02}.png", optimize=True)
 
                 body = Image.open(_base_frame_path(direction, animation, index)).convert("RGBA")
-                composite = Image.alpha_composite(layer, body)
+                composite = Image.alpha_composite(body, layer)
                 preview.alpha_composite(composite, (column * 128, row * 148 + 20))
                 column += 1
 

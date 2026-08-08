@@ -6,6 +6,17 @@ extends RefCounted
 # --- Константы движения ---
 const MOVE_SPEED: float = 5.0
 
+# --- Помощь при наведении ---
+## Радиус прилипания курсора к экранной позиции противника.
+const AIM_ASSIST_RADIUS_PX: float = 88.0
+## Текущая цель получает небольшой бонус, чтобы метка не дрожала между соседними врагами.
+const AIM_ASSIST_STICKY_BONUS_PX: float = 20.0
+## Высота точки наведения над основанием CharacterBody3D.
+const AIM_TARGET_HEIGHT: float = 1.0
+## Высота и вынос точки появления стрелы/заклинания, чтобы снаряд не возникал в ногах.
+const PROJECTILE_SPAWN_HEIGHT: float = 1.05
+const PROJECTILE_SPAWN_FORWARD_OFFSET: float = 0.45
+
 const GRAVITY: float = -20.0
 
 const DODGE_SPEED: float = 12.0

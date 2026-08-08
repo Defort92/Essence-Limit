@@ -96,9 +96,9 @@ anchor_top = 0.5
 anchor_right = 0.5
 anchor_bottom = 0.5
 offset_left = -230.0
-offset_top = -210.0
+offset_top = -250.0
 offset_right = 230.0
-offset_bottom = 210.0
+offset_bottom = 250.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -191,6 +191,10 @@ script = ExtResource("2_sep")
 layout_mode = 2
 text = "Управление"
 
+[node name="DeveloperVisualSettingsButton" type="Button" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
+layout_mode = 2
+text = "Настройки разработчика"
+
 [node name="BackButton" type="Button" parent="Dim/SettingsPanel/Margin/VBoxContainer"]
 layout_mode = 2
 text = "Назад"
@@ -203,6 +207,7 @@ text = "Назад"
 [connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/MainMenuButton" to="." method="_on_main_menu_pressed"]
 [connection signal="pressed" from="Dim/CenterContainer/Panel/Margin/VBoxContainer/QuitButton" to="." method="_on_quit_pressed"]
 [connection signal="pressed" from="Dim/SettingsPanel/Margin/VBoxContainer/ControlsButton" to="." method="_on_controls_pressed"]
+[connection signal="pressed" from="Dim/SettingsPanel/Margin/VBoxContainer/DeveloperVisualSettingsButton" to="." method="_on_developer_visual_settings_pressed"]
 [connection signal="pressed" from="Dim/SettingsPanel/Margin/VBoxContainer/BackButton" to="." method="_on_settings_back_pressed"]
 [connection signal="value_changed" from="Dim/SettingsPanel/Margin/VBoxContainer/VolumeRow/VolumeSlider" to="." method="_on_volume_changed"]
 [connection signal="toggled" from="Dim/SettingsPanel/Margin/VBoxContainer/FullscreenRow/FullscreenCheck" to="." method="_on_fullscreen_toggled"]

@@ -33,14 +33,21 @@ signal item_broke(slot: int, item: EquipmentData)
 func equip_from_inventory(item: EquipmentData) -> bool:
 	if not _inventory().has_item(item.id):
 		return false
-	if not equip(item):
+	# Сначала освобождаем ячейку рюкзака: при замене предметов из рук
+	# снятому снаряжению гарантированно будет куда вернуться.
+	if not _inventory().remove_item(item.id, 1):
 		return false
-	_inventory().remove_item(item.id, 1)
+	if not equip(item):
+		_inventory().add_item(item)
+		return false
 	return true
 
 ## Надевает [param item] напрямую (без удаления из рюкзака).
 ## Используй equip_from_inventory() из UI; этот метод — для внутренней логики и загрузки.
-## Двуручное оружие автоматически снимает предмет со слота WEAPON_OFF.
+## Для оружия поле item.slot задаёт категорию предмета, но не фиксированную руку:
+## менеджер сам выбирает основную/вспомогательную руку по текущей экипировке.
+## Двуручное оружие физически хранится в основной руке, а get_equipped(WEAPON_OFF)
+## возвращает тот же предмет, чтобы вспомогательная рука отображалась занятой.
 ## Возвращает [code]false[/code] если аксессуарный список заполнен.
 func equip(item: EquipmentData) -> bool:
 	if item.slot == EquipmentData.Slot.ACCESSORY:
@@ -52,9 +59,11 @@ func equip(item: EquipmentData) -> bool:
 		equipment_changed.emit()
 		return true
 
-	if item.weapon_type == EquipmentData.WeaponType.MELEE_TWO_HAND:
-		_displace_slot(EquipmentData.Slot.WEAPON_OFF)
+	if _is_hand_item(item):
+		return _equip_hand_item(item)
 
+	if not _can_displace_slots([item.slot]):
+		return false
 	_displace_slot(item.slot)
 	_equipped[item.slot] = item
 	_broken_slots.erase(item.slot)
@@ -68,6 +77,7 @@ func equip(item: EquipmentData) -> bool:
 func unequip_slot(slot: EquipmentData.Slot) -> bool:
 	if slot == EquipmentData.Slot.ACCESSORY:
 		return false
+	slot = _physical_slot(slot)
 	if not _equipped.has(slot):
 		return false
 	var item: EquipmentData = _equipped[slot]
@@ -99,6 +109,7 @@ func unequip_accessory(index: int) -> bool:
 ## кладёт в рюкзак ВЛАДЕЛЬЦА этой экипировки — для мёртвого союзника это не то, что нужно).
 ## Возвращает [code]null[/code], если слот пуст или это ACCESSORY (см. take_accessory).
 func take_from_slot(slot: EquipmentData.Slot) -> EquipmentData:
+	slot = _physical_slot(slot)
 	if slot == EquipmentData.Slot.ACCESSORY or not _equipped.has(slot):
 		return null
 	var item: EquipmentData = _equipped[slot]
@@ -121,7 +132,36 @@ func take_accessory(index: int) -> EquipmentData:
 
 ## Возвращает надетый предмет в слоте [param slot], или [code]null[/code] если слот пуст.
 func get_equipped(slot: EquipmentData.Slot) -> EquipmentData:
+	if slot == EquipmentData.Slot.WEAPON_OFF:
+		var main_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_MAIN, null)
+		if main_hand != null and main_hand.is_two_handed_weapon():
+			return main_hand
 	return _equipped.get(slot, null)
+
+## Одноручные оружия в обеих руках можно поменять местами. Щит и двуручное
+## оружие намеренно не допускаются к перестановке.
+func can_swap_hands() -> bool:
+	var main_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_MAIN, null)
+	var off_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_OFF, null)
+	return (
+		main_hand != null
+		and off_hand != null
+		and main_hand.weapon_type == EquipmentData.WeaponType.MELEE_ONE_HAND
+		and off_hand.weapon_type == EquipmentData.WeaponType.MELEE_ONE_HAND
+	)
+
+func swap_hands() -> bool:
+	if not can_swap_hands():
+		return false
+	var main_hand: EquipmentData = _equipped[EquipmentData.Slot.WEAPON_MAIN]
+	var main_broken: bool = _broken_slots.get(EquipmentData.Slot.WEAPON_MAIN, false)
+	var off_broken: bool = _broken_slots.get(EquipmentData.Slot.WEAPON_OFF, false)
+	_equipped[EquipmentData.Slot.WEAPON_MAIN] = _equipped[EquipmentData.Slot.WEAPON_OFF]
+	_equipped[EquipmentData.Slot.WEAPON_OFF] = main_hand
+	_set_slot_broken(EquipmentData.Slot.WEAPON_MAIN, off_broken)
+	_set_slot_broken(EquipmentData.Slot.WEAPON_OFF, main_broken)
+	equipment_changed.emit()
+	return true
 
 ## Возвращает копию списка надетых аксессуаров.
 func get_accessories() -> Array[EquipmentData]:
@@ -165,6 +205,7 @@ func clear() -> void:
 func break_equipped_item(slot: EquipmentData.Slot) -> void:
 	if slot == EquipmentData.Slot.ACCESSORY:
 		return
+	slot = _physical_slot(slot)
 	var item: EquipmentData = _equipped.get(slot, null)
 	if item == null or _broken_slots.get(slot, false):
 		return
@@ -187,6 +228,7 @@ func break_accessory(index: int) -> void:
 func is_slot_broken(slot: EquipmentData.Slot) -> bool:
 	if slot == EquipmentData.Slot.ACCESSORY:
 		return false
+	slot = _physical_slot(slot)
 	return _broken_slots.get(slot, false)
 
 ## Возвращает [code]true[/code] если аксессуар с индексом [param index] сломан.
@@ -198,6 +240,7 @@ func is_accessory_broken(index: int) -> bool:
 ## Возвращает стоимость починки предмета в слоте [param slot] в золоте.
 ## Формула: buy_price / REPAIR_COST_DIVISOR, минимум 1.
 func get_repair_cost(slot: EquipmentData.Slot) -> int:
+	slot = _physical_slot(slot)
 	var item: EquipmentData = _equipped.get(slot, null)
 	if item == null:
 		return 0
@@ -222,6 +265,7 @@ func get_accessory_repair_cost(index: int) -> int:
 func repair_slot(slot: EquipmentData.Slot) -> bool:
 	if slot == EquipmentData.Slot.ACCESSORY:
 		return false
+	slot = _physical_slot(slot)
 	if not _broken_slots.get(slot, false):
 		return false
 	var cost := get_repair_cost(slot)
@@ -305,6 +349,7 @@ func _inventory() -> InventoryComponent:
 
 # Снимает предмет из слота и кладёт в рюкзак без эмита equipment_changed.
 func _displace_slot(slot: EquipmentData.Slot) -> void:
+	slot = _physical_slot(slot)
 	if not _equipped.has(slot):
 		return
 	var old_item: EquipmentData = _equipped[slot]
@@ -312,3 +357,110 @@ func _displace_slot(slot: EquipmentData.Slot) -> void:
 	_broken_slots.erase(slot)
 	_inventory().add_item(old_item)
 	item_unequipped.emit(slot, old_item)
+
+func _equip_hand_item(item: EquipmentData) -> bool:
+	var target_slot := EquipmentData.Slot.WEAPON_MAIN
+	var slots_to_displace: Array[EquipmentData.Slot] = []
+	var main_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_MAIN, null)
+	var off_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_OFF, null)
+
+	match item.weapon_type:
+		EquipmentData.WeaponType.SHIELD:
+			target_slot = EquipmentData.Slot.WEAPON_OFF
+			# Щит нельзя совместить с двуручным оружием.
+			if main_hand != null and main_hand.is_two_handed_weapon():
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_MAIN)
+			if off_hand != null:
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_OFF)
+		EquipmentData.WeaponType.MELEE_TWO_HAND, \
+		EquipmentData.WeaponType.RANGED, \
+		EquipmentData.WeaponType.MAGIC:
+			if main_hand != null:
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_MAIN)
+			if off_hand != null:
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_OFF)
+		_:
+			if main_hand == null:
+				target_slot = EquipmentData.Slot.WEAPON_MAIN
+			elif main_hand.is_two_handed_weapon():
+				target_slot = EquipmentData.Slot.WEAPON_MAIN
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_MAIN)
+			elif off_hand == null:
+				target_slot = EquipmentData.Slot.WEAPON_OFF
+			else:
+				# При занятых руках новое оружие заменяет основное; щит остаётся
+				# во вспомогательной руке.
+				target_slot = EquipmentData.Slot.WEAPON_MAIN
+				slots_to_displace.append(EquipmentData.Slot.WEAPON_MAIN)
+
+	if not _can_displace_slots(slots_to_displace):
+		return false
+	for slot in slots_to_displace:
+		_displace_slot(slot)
+	_equipped[target_slot] = item
+	_broken_slots.erase(target_slot)
+	item_equipped.emit(target_slot, item)
+	equipment_changed.emit()
+	return true
+
+func _is_hand_item(item: EquipmentData) -> bool:
+	return item.weapon_type != EquipmentData.WeaponType.NONE
+
+## Возвращает реальный слот хранения. Вторая рука двуручного оружия виртуальна.
+func _physical_slot(slot: EquipmentData.Slot) -> EquipmentData.Slot:
+	if slot == EquipmentData.Slot.WEAPON_OFF:
+		var main_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_MAIN, null)
+		if main_hand != null and main_hand.is_two_handed_weapon():
+			return EquipmentData.Slot.WEAPON_MAIN
+	return slot
+
+func _can_displace_slots(slots: Array[EquipmentData.Slot]) -> bool:
+	var unique_physical_slots: Dictionary = {}
+	for slot in slots:
+		var physical_slot := _physical_slot(slot)
+		if _equipped.has(physical_slot):
+			unique_physical_slots[physical_slot] = true
+	var free_inventory_slots: int = (
+		InventorySystemConstants.MAX_SLOTS - _inventory().get_slots().size()
+	)
+	return unique_physical_slots.size() <= free_inventory_slots
+
+func _set_slot_broken(slot: EquipmentData.Slot, broken: bool) -> void:
+	if broken:
+		_broken_slots[slot] = true
+	else:
+		_broken_slots.erase(slot)
+
+## Исправляет старые сохранения, где лук/посох могли лежать во второй руке или
+## соседствовать с другим предметом. Вызывать после загрузки рюкзака, чтобы вытеснённый
+## предмет можно было сохранить без потери.
+func normalize_loaded_hands() -> void:
+	var main_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_MAIN, null)
+	var off_hand: EquipmentData = _equipped.get(EquipmentData.Slot.WEAPON_OFF, null)
+	if main_hand != null and main_hand.is_two_handed_weapon() and off_hand != null:
+		if _inventory().add_item(off_hand):
+			_equipped.erase(EquipmentData.Slot.WEAPON_OFF)
+			_broken_slots.erase(EquipmentData.Slot.WEAPON_OFF)
+			off_hand = null
+	elif off_hand != null and off_hand.is_two_handed_weapon():
+		if main_hand == null or _inventory().add_item(main_hand):
+			var was_broken: bool = _broken_slots.get(EquipmentData.Slot.WEAPON_OFF, false)
+			_equipped[EquipmentData.Slot.WEAPON_MAIN] = off_hand
+			_equipped.erase(EquipmentData.Slot.WEAPON_OFF)
+			_broken_slots.erase(EquipmentData.Slot.WEAPON_OFF)
+			_set_slot_broken(EquipmentData.Slot.WEAPON_MAIN, was_broken)
+			main_hand = off_hand
+			off_hand = null
+	# Старые сохранения могли положить щит в основную руку. Переносим его во
+	# вспомогательную, только если это не уничтожит другой экипированный предмет.
+	if (
+		main_hand != null
+		and main_hand.weapon_type == EquipmentData.WeaponType.SHIELD
+		and off_hand == null
+	):
+		_equipped[EquipmentData.Slot.WEAPON_OFF] = main_hand
+		_equipped.erase(EquipmentData.Slot.WEAPON_MAIN)
+		var was_broken: bool = _broken_slots.get(EquipmentData.Slot.WEAPON_MAIN, false)
+		_broken_slots.erase(EquipmentData.Slot.WEAPON_MAIN)
+		_set_slot_broken(EquipmentData.Slot.WEAPON_OFF, was_broken)
+	equipment_changed.emit()
