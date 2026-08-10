@@ -1,7 +1,11 @@
 extends SceneTree
 
 const BODY_FRAMES := "res://assets/sprites/characters/base/frames"
-const SWORD_FRAMES := "res://assets/sprites/equipment/iron_sword/frames"
+const WEAPON_FRAMES := {
+	"Sword": "res://assets/sprites/equipment/iron_sword/frames",
+	"Bow": "res://assets/sprites/equipment/training_bow/frames",
+	"Staff": "res://assets/sprites/equipment/apprentice_staff/frames",
+}
 const EQUIPMENT_LAYER_SCRIPT := preload(
 	"res://scripts/components/directional_equipment_layer.gd"
 )
@@ -22,34 +26,37 @@ func _run_test() -> void:
 	body.frames_dir = BODY_FRAMES
 	root.add_child(body)
 
-	var sword := EQUIPMENT_LAYER_SCRIPT.new()
-	sword.source_sprite = body
-	root.add_child(sword)
-	sword.set_frames_dir(SWORD_FRAMES)
+	var layer := EQUIPMENT_LAYER_SCRIPT.new()
+	layer.source_sprite = body
+	root.add_child(layer)
 	await process_frame
 
-	for sector in 8:
-		if sword.get_animation_frame_count(sector, false) != 4:
-			push_error("Sword idle frame count mismatch in sector %d." % sector)
-			quit(1)
-			return
-		if sword.get_animation_frame_count(sector, true) != 8:
-			push_error("Sword run frame count mismatch in sector %d." % sector)
-			quit(1)
-			return
-		body.face_direction(DIRECTIONS[sector])
-		body.set_moving(false)
-		body.set_moving(true)
-		body._process(0.0)
-		sword._process(0.0)
-		if sword.texture == null or not sword.visible:
-			push_error("Sword layer is not visible in sector %d." % sector)
-			quit(1)
-			return
-		if sword.flip_h != (sector >= 5):
-			push_error("Sword mirror mismatch in sector %d." % sector)
-			quit(1)
-			return
+	for weapon_name: String in WEAPON_FRAMES:
+		layer.set_frames_dir(WEAPON_FRAMES[weapon_name])
+		for sector in 8:
+			if layer.get_animation_frame_count(sector, false) != 4:
+				push_error("%s idle frame count mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			if layer.get_animation_frame_count(sector, true) != 8:
+				push_error("%s run frame count mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			body.face_direction(DIRECTIONS[sector])
+			body.set_moving(false)
+			body.set_moving(true)
+			body._process(0.0)
+			layer._process(0.0)
+			if layer.texture == null or not layer.visible:
+				push_error("%s layer is not visible in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			if layer.flip_h != (sector >= 5):
+				push_error("%s mirror mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+
+	layer.set_frames_dir(WEAPON_FRAMES["Sword"])
 
 	body.face_direction(DIRECTIONS[4])
 	body.set_moving(false)
@@ -58,17 +65,20 @@ func _run_test() -> void:
 		+ body.idle_frame_duration * 5.0
 		+ 0.001
 	)
-	sword._process(0.0)
-	if not sword.texture.resource_path.ends_with("/back/idle/default/frame_04.png"):
+	layer._process(0.0)
+	if (
+		layer.texture == null
+		or not layer.texture.resource_path.ends_with("/back/idle/default/frame_04.png")
+	):
 		push_error("Sword idle phase did not scale from 6 body frames to 4 equipment frames.")
 		quit(1)
 		return
 
-	sword.set_frames_dir("")
-	if sword.visible or sword.texture != null:
+	layer.set_frames_dir("")
+	if layer.visible or layer.texture != null:
 		push_error("Sword layer did not clear after unequip.")
 		quit(1)
 		return
 
-	print("[DirectionalEquipmentLayerTest] PASS: idle, run, mirror, unequip.")
+	print("[DirectionalEquipmentLayerTest] PASS: 3 weapons, idle, run, mirror, unequip.")
 	quit()

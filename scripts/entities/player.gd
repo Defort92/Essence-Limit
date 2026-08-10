@@ -1698,6 +1698,12 @@ func _sync_equipment_visuals() -> void:
 	if _weapon_sprite == null:
 		return
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
+	# The current character scene has one equipment layer. Prefer the main hand,
+	# but still show a drawable one-handed weapon when it lives in the off hand.
+	if weapon == null or weapon.sprite_frames_dir.is_empty():
+		var off_hand := equipment.get_equipped(EquipmentData.Slot.WEAPON_OFF)
+		if off_hand != null and not off_hand.sprite_frames_dir.is_empty():
+			weapon = off_hand
 	_weapon_sprite.set_frames_dir(weapon.sprite_frames_dir if weapon != null else "")
 
 ## Пересчитывает max_health по формуле (base + ADD_mods) * MULTIPLY_mods.

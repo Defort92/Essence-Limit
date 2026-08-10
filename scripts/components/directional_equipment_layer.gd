@@ -31,8 +31,11 @@ func set_frames_dir(frames_dir: String) -> void:
 		_sync_frame()
 		return
 	_frames_dir = frames_dir
-	_idle_frames.clear()
-	_movement_frames.clear()
+	# Cached arrays are shared between equipment layers. Replacing our references
+	# keeps the cache intact when a character switches to another weapon; clear()
+	# here used to empty the cached sword clips permanently.
+	_idle_frames = []
+	_movement_frames = []
 	_named_clip_frames.clear()
 	texture = null
 	visible = false

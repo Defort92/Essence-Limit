@@ -16,6 +16,7 @@ is_stackable = false
 max_stack = 1
 slot = 4
 weapon_type = 3
+sprite_frames_dir = "res://assets/sprites/equipment/training_bow/frames"
 stat_bonuses = {
 "damage": 4,
 "projectile_speed": 30.0,
