@@ -40,6 +40,10 @@ LootSpawner="*res://scripts/systems/loot_spawner.gd"
 ShopSystem="*res://scripts/systems/shop_system.gd"
 CraftingSystem="*res://scripts/systems/crafting_system.gd"
 
+[editor_plugins]
+
+enabled=PackedStringArray("res://addons/equipment_alignment_editor/plugin.cfg")
+
 [gui]
 
 theme/custom="res://assets/themes/essence_theme.tres"

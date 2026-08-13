@@ -1589,7 +1589,10 @@ func _sync_equipment_visuals() -> void:
 	if _weapon_sprite == null:
 		return
 	var weapon := equipment.get_equipped(EquipmentData.Slot.WEAPON_MAIN)
-	_weapon_sprite.set_frames_dir(weapon.sprite_frames_dir if weapon != null else "")
+	_weapon_sprite.set_equipment_visual(
+		weapon.sprite_frames_dir if weapon != null else "",
+		weapon.alignment_profile if weapon != null else null
+	)
 
 ## Пересчитывает max_health по формуле (base + ADD_mods) * MULTIPLY_mods.
 func _recalculate_derived_stats() -> void:

@@ -8,6 +8,9 @@ const SWORD_FRAMES := "res://assets/sprites/equipment/iron_sword/frames"
 const EQUIPMENT_LAYER_SCRIPT := preload(
 	"res://scripts/components/directional_equipment_layer.gd"
 )
+const ALIGNMENT_PROFILE_SCRIPT := preload(
+	"res://scripts/data/equipment_alignment_profile.gd"
+)
 const DIRECTIONS: Array[Vector3] = [
 	Vector3(0.0, 0.0, 1.0), Vector3(1.0, 0.0, 1.0),
 	Vector3(1.0, 0.0, 0.0), Vector3(1.0, 0.0, -1.0),
@@ -32,7 +35,10 @@ func _run_test() -> void:
 	var sword := EQUIPMENT_LAYER_SCRIPT.new()
 	sword.source_sprite = body
 	root.add_child(sword)
-	sword.set_frames_dir(SWORD_FRAMES)
+	var profile := ALIGNMENT_PROFILE_SCRIPT.new()
+	profile.set_frame_total_offset(&"front", &"run", 0, Vector2(3.0, 2.0))
+	profile.set_frame_total_offset(&"front-right", &"run", 0, Vector2(4.0, 1.0))
+	sword.set_equipment_visual(SWORD_FRAMES, profile)
 	await process_frame
 
 	for sector in 8:
@@ -57,12 +63,20 @@ func _run_test() -> void:
 			push_error("Sword mirror mismatch in sector %d." % sector)
 			quit(1)
 			return
+		if sector == 0 and sword.get_applied_alignment_offset() != Vector2(3.0, 2.0):
+			push_error("Front alignment profile was not applied.")
+			quit(1)
+			return
+		if sector == 7 and sword.get_applied_alignment_offset() != Vector2(-4.0, 1.0):
+			push_error("Mirrored alignment did not negate the X offset.")
+			quit(1)
+			return
 
 	sword.set_frames_dir("")
-	if sword.visible or sword.texture != null:
+	if sword.visible or sword.texture != null or not sword.offset.is_zero_approx():
 		push_error("Sword layer did not clear after unequip.")
 		quit(1)
 		return
 
-	print("[DirectionalEquipmentLayerTest] PASS: idle, run, mirror, unequip.")
+	print("[DirectionalEquipmentLayerTest] PASS: frames, alignment, mirror, unequip.")
 	quit()

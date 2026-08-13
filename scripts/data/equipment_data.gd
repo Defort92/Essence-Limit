@@ -21,5 +21,7 @@ enum WeaponType { NONE, MELEE_ONE_HAND, MELEE_TWO_HAND, RANGED, SHIELD }
 ## Каталог 128x128 кадров отдельного визуального слоя экипировки.
 ## Ожидаются подпапки направлений с idle_NN.png и run_NN.png.
 @export_dir var sprite_frames_dir: String = ""
+## Optional non-destructive placement metadata authored by Equipment Alignment Editor.
+@export var alignment_profile: EquipmentAlignmentProfile
 ## Ключи — названия статов: "strength", "agility", "intellect", "max_health".
 @export var stat_bonuses: Dictionary = {}
