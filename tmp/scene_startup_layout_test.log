@@ -1,0 +1,37 @@
+Godot Engine v4.7.stable.official.5b4e0cb0f - https://godotengine.org
+
+[GrassStreaming] setup=0.04 ms coverage_image=0.03 ms
+ERROR: Not supported by this display server.
+   at: keyboard_get_keycode_from_physical (servers/display/display_server.cpp:1224)
+   GDScript backtrace (most recent call first):
+       [0] keycode_label (res://scripts/systems/input_settings.gd:69)
+       [1] action_key_label (res://scripts/systems/input_settings.gd:63)
+       [2] _update_prompt_text (res://scripts/entities/scene_portal.gd:61)
+       [3] _ready (res://scripts/entities/scene_portal.gd:27)
+       [4] _run_test (res://scripts/tests/scene_startup_breakdown_test.gd:34)
+ERROR: Not supported by this display server.
+   at: keyboard_get_keycode_from_physical (servers/display/display_server.cpp:1224)
+   GDScript backtrace (most recent call first):
+       [0] keycode_label (res://scripts/systems/input_settings.gd:69)
+       [1] action_key_label (res://scripts/systems/input_settings.gd:63)
+       [2] _update_tooltip (res://scripts/ui/components/ui_close_button.gd:29)
+       [3] _ready (res://scripts/ui/components/ui_close_button.gd:23)
+       [4] _run_test (res://scripts/tests/scene_startup_breakdown_test.gd:34)
+ERROR: Not supported by this display server.
+   at: keyboard_get_keycode_from_physical (servers/display/display_server.cpp:1224)
+   GDScript backtrace (most recent call first):
+       [0] keycode_label (res://scripts/systems/input_settings.gd:69)
+       [1] action_key_label (res://scripts/systems/input_settings.gd:63)
+       [2] _update_tooltip (res://scripts/ui/components/ui_close_button.gd:29)
+       [3] _ready (res://scripts/ui/components/ui_close_button.gd:23)
+       [4] _run_test (res://scripts/tests/scene_startup_breakdown_test.gd:34)
+ERROR: Not supported by this display server.
+   at: keyboard_get_keycode_from_physical (servers/display/display_server.cpp:1224)
+   GDScript backtrace (most recent call first):
+       [0] keycode_label (res://scripts/systems/input_settings.gd:69)
+       [1] action_key_label (res://scripts/systems/input_settings.gd:63)
+       [2] _update_tooltip (res://scripts/ui/components/ui_close_button.gd:29)
+       [3] _ready (res://scripts/ui/components/ui_close_button.gd:23)
+       [4] _run_test (res://scripts/tests/scene_startup_breakdown_test.gd:34)
+[SceneStartupBreakdown] mode=baseline load=576.14 ms instantiate=8.43 ms ready=165.52 ms total=173.95 ms
+[GrassStreaming] focus=(5, 5) desired=25 active=0 pending=25 cached=0

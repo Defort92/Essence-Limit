@@ -46,7 +46,8 @@ func _build_characteristics(item: ItemData) -> PackedStringArray:
 	if item is EquipmentData:
 		var equipment := item as EquipmentData
 		lines.append("Тип: %s" % ItemDetailsPopupConstants.WEAPON_TYPE_NAMES.get(equipment.weapon_type, "Снаряжение"))
-		lines.append("Слот: %s" % ItemDetailsPopupConstants.SLOT_NAMES.get(equipment.slot, "Не указан"))
+		var slot_name: String = "Руки" if equipment.weapon_type != EquipmentData.WeaponType.NONE else ItemDetailsPopupConstants.SLOT_NAMES.get(equipment.slot, "Не указан")
+		lines.append("Слот: %s" % slot_name)
 		_append_stat_bonuses(lines, equipment.stat_bonuses)
 	elif item is EssenceData:
 		var essence := item as EssenceData

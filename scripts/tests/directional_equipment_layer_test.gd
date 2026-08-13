@@ -1,10 +1,11 @@
 extends SceneTree
 
 const BODY_FRAMES := "res://assets/sprites/characters/base/frames"
-const FRONT_RUN_FRAMES := (
-	"res://assets/sprites/characters/base/frames/front/run_v10_source_exact"
-)
-const SWORD_FRAMES := "res://assets/sprites/equipment/iron_sword/frames"
+const WEAPON_FRAMES := {
+	"Sword": "res://assets/sprites/equipment/iron_sword/frames",
+	"Bow": "res://assets/sprites/equipment/training_bow/frames",
+	"Staff": "res://assets/sprites/equipment/apprentice_staff/frames",
+}
 const EQUIPMENT_LAYER_SCRIPT := preload(
 	"res://scripts/components/directional_equipment_layer.gd"
 )
@@ -26,57 +27,83 @@ func _initialize() -> void:
 func _run_test() -> void:
 	var body := DirectionalSprite3D.new()
 	body.frames_dir = BODY_FRAMES
-	body.movement_frames_subdir = "run_v1"
-	body.movement_frames_prefix = "run"
-	body.front_movement_frames_dir = FRONT_RUN_FRAMES
-	body.front_movement_frames_prefix = "run"
 	root.add_child(body)
 
-	var sword := EQUIPMENT_LAYER_SCRIPT.new()
-	sword.source_sprite = body
-	root.add_child(sword)
-	var profile := ALIGNMENT_PROFILE_SCRIPT.new()
+	var layer: DirectionalEquipmentLayer3D = EQUIPMENT_LAYER_SCRIPT.new()
+	layer.source_sprite = body
+	root.add_child(layer)
+	await process_frame
+	var profile: EquipmentAlignmentProfile = ALIGNMENT_PROFILE_SCRIPT.new()
 	profile.set_frame_total_offset(&"front", &"run", 0, Vector2(3.0, 2.0))
 	profile.set_frame_total_offset(&"front-right", &"run", 0, Vector2(4.0, 1.0))
-	sword.set_equipment_visual(SWORD_FRAMES, profile)
-	await process_frame
 
-	for sector in 8:
-		if sword.get_animation_frame_count(sector, false) != 4:
-			push_error("Sword idle frame count mismatch in sector %d." % sector)
-			quit(1)
-			return
-		if sword.get_animation_frame_count(sector, true) != 8:
-			push_error("Sword run frame count mismatch in sector %d." % sector)
-			quit(1)
-			return
-		body.face_direction(DIRECTIONS[sector])
-		body.set_moving(false)
-		body.set_moving(true)
-		body._process(0.0)
-		sword._process(0.0)
-		if sword.texture == null or not sword.visible:
-			push_error("Sword layer is not visible in sector %d." % sector)
-			quit(1)
-			return
-		if sword.flip_h != (sector >= 5):
-			push_error("Sword mirror mismatch in sector %d." % sector)
-			quit(1)
-			return
-		if sector == 0 and sword.get_applied_alignment_offset() != Vector2(3.0, 2.0):
-			push_error("Front alignment profile was not applied.")
-			quit(1)
-			return
-		if sector == 7 and sword.get_applied_alignment_offset() != Vector2(-4.0, 1.0):
-			push_error("Mirrored alignment did not negate the X offset.")
-			quit(1)
-			return
+	for weapon_name: String in WEAPON_FRAMES:
+		layer.set_equipment_visual(
+			WEAPON_FRAMES[weapon_name],
+			profile if weapon_name == "Sword" else null
+		)
+		for sector in 8:
+			if layer.get_animation_frame_count(sector, false) != 4:
+				push_error("%s idle frame count mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			if layer.get_animation_frame_count(sector, true) != 8:
+				push_error("%s run frame count mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			body.face_direction(DIRECTIONS[sector])
+			body.set_moving(false)
+			body.set_moving(true)
+			body._process(0.0)
+			layer._process(0.0)
+			if layer.texture == null or not layer.visible:
+				push_error("%s layer is not visible in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			if layer.flip_h != (sector >= 5):
+				push_error("%s mirror mismatch in sector %d." % [weapon_name, sector])
+				quit(1)
+				return
+			if (
+				weapon_name == "Sword"
+				and sector == 0
+				and layer.get_applied_alignment_offset() != Vector2(3.0, 2.0)
+			):
+				push_error("Front alignment profile was not applied.")
+				quit(1)
+				return
+			if (
+				weapon_name == "Sword"
+				and sector == 7
+				and layer.get_applied_alignment_offset() != Vector2(-4.0, 1.0)
+			):
+				push_error("Mirrored alignment did not negate the X offset.")
+				quit(1)
+				return
 
-	sword.set_frames_dir("")
-	if sword.visible or sword.texture != null or not sword.offset.is_zero_approx():
+	layer.set_equipment_visual(WEAPON_FRAMES["Sword"], profile)
+
+	body.face_direction(DIRECTIONS[4])
+	body.set_moving(false)
+	body._process(
+		body.get_idle_pause_remaining()
+		+ body.idle_frame_duration * 5.0
+		+ 0.001
+	)
+	layer._process(0.0)
+	if (
+		layer.texture == null
+		or not layer.texture.resource_path.ends_with("/back/idle/default/frame_04.png")
+	):
+		push_error("Sword idle phase did not scale from 6 body frames to 4 equipment frames.")
+		quit(1)
+		return
+
+	layer.set_frames_dir("")
+	if layer.visible or layer.texture != null or not layer.offset.is_zero_approx():
 		push_error("Sword layer did not clear after unequip.")
 		quit(1)
 		return
 
-	print("[DirectionalEquipmentLayerTest] PASS: frames, alignment, mirror, unequip.")
+	print("[DirectionalEquipmentLayerTest] PASS: 3 weapons, phase, alignment, mirror, unequip.")
 	quit()

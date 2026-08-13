@@ -15,6 +15,7 @@ const RARITY_COLORS := [
 const STAT_NAMES := {
 	"damage": "Урон",
 	"range": "Дальность",
+	"projectile_speed": "Скорость снаряда",
 	"defense": "Защита",
 	"strength": "Сила",
 	"agility": "Ловкость",
@@ -29,7 +30,7 @@ const SLOT_NAMES := {
 	EquipmentData.Slot.LEGS: "Ноги",
 	EquipmentData.Slot.GLOVES: "Перчатки",
 	EquipmentData.Slot.WEAPON_MAIN: "Основная рука",
-	EquipmentData.Slot.WEAPON_OFF: "Вторая рука",
+	EquipmentData.Slot.WEAPON_OFF: "Вспомогательная рука",
 	EquipmentData.Slot.ACCESSORY: "Аксессуар",
 }
 
@@ -37,8 +38,9 @@ const WEAPON_TYPE_NAMES := {
 	EquipmentData.WeaponType.NONE: "Снаряжение",
 	EquipmentData.WeaponType.MELEE_ONE_HAND: "Одноручное оружие",
 	EquipmentData.WeaponType.MELEE_TWO_HAND: "Двуручное оружие",
-	EquipmentData.WeaponType.RANGED: "Дальнобойное оружие",
+	EquipmentData.WeaponType.RANGED: "Двуручное дальнобойное оружие",
 	EquipmentData.WeaponType.SHIELD: "Щит",
+	EquipmentData.WeaponType.MAGIC: "Двуручное магическое оружие",
 }
 
 const EFFECT_NAMES := {

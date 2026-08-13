@@ -14,6 +14,7 @@
 [ext_resource type="Script" uid="uid://6i7mxyjfcni2" path="res://scripts/effects/dylearn/LightDirection.gd" id="13_light_direction"]
 [ext_resource type="Script" path="res://scripts/prototypes/grass_demo_player.gd" id="14_demo_player"]
 [ext_resource type="Script" uid="uid://dha1vebhsho8t" path="res://scripts/components/directional_sprite.gd" id="15_directional_sprite"]
+[ext_resource type="Script" path="res://scripts/prototypes/pixel_visual_style_lab.gd" id="16_visual_style_lab"]
 
 [sub_resource type="Environment" id="Environment_prototype"]
 background_mode = 1
@@ -152,6 +153,7 @@ radius = 0.32
 height = 1.2
 
 [node name="PixelVisualStylePrototype" type="Node3D"]
+script = ExtResource("16_visual_style_lab")
 
 [node name="World" type="Node3D" parent="."]
 

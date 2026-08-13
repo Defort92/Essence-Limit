@@ -1,0 +1,24 @@
+[gd_resource type="Resource" format=3]
+
+[ext_resource type="Script" path="res://scripts/data/equipment_data.gd" id="1"]
+[ext_resource type="Texture2D" path="res://assets/icons/items/apprentice_staff.svg" id="2"]
+
+[resource]
+script = ExtResource("1")
+id = "apprentice_staff"
+display_name = "Посох ученика"
+description = "Простой двуручный магический посох. Урон зависит от интеллекта."
+icon = ExtResource("2")
+rarity = 0
+buy_price = 45
+sell_price = 14
+is_stackable = false
+max_stack = 1
+slot = 4
+weapon_type = 5
+sprite_frames_dir = "res://assets/sprites/equipment/apprentice_staff/frames"
+stat_bonuses = {
+"damage": 5,
+"projectile_speed": 13.0,
+"range": 9.0
+}

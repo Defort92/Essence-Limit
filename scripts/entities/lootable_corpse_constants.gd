@@ -12,8 +12,8 @@ const SLOT_NAMES := {
 	EquipmentData.Slot.BODY: "Тело",
 	EquipmentData.Slot.LEGS: "Ноги",
 	EquipmentData.Slot.GLOVES: "Перчатки",
-	EquipmentData.Slot.WEAPON_MAIN: "Оружие",
-	EquipmentData.Slot.WEAPON_OFF: "Вторая рука",
+	EquipmentData.Slot.WEAPON_MAIN: "Основная рука",
+	EquipmentData.Slot.WEAPON_OFF: "Вспомогательная рука",
 }
 
 const ARMOR_SLOTS := [

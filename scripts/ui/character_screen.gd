@@ -101,6 +101,14 @@ func _rebuild_equipment_list() -> void:
 		if item == null:
 			_equipment_list.add_child(UIListRow.create("%s: пусто" % label_name))
 			continue
+		if (
+			slot == EquipmentData.Slot.WEAPON_OFF
+			and item.is_two_handed_weapon()
+		):
+			_equipment_list.add_child(UIListRow.create(
+				"%s: занята (%s)" % [label_name, item.display_name]
+			))
+			continue
 		if target_equipment.is_slot_broken(slot):
 			var cost: int = target_equipment.get_repair_cost(slot)
 			_equipment_list.add_child(UIListRow.create(
@@ -118,6 +126,14 @@ func _rebuild_equipment_list() -> void:
 					{"text": "Снять", "callback": func() -> void: target_equipment.unequip_slot(slot)},
 				]
 			))
+
+	if target_equipment.can_swap_hands():
+		_equipment_list.add_child(UIListRow.create(
+			"Оружие в руках",
+			[
+				{"text": "Поменять местами", "callback": func() -> void: target_equipment.swap_hands()},
+			]
+		))
 
 	var accessories: Array[EquipmentData] = target_equipment.get_accessories()
 	for idx in accessories.size():

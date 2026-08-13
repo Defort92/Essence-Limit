@@ -10,9 +10,9 @@ back.png, full_left.png, ...) and produces:
                         Bands are strictly disjoint, so composing all parts at
                         zero offsets rebuilds the anchored original EXACTLY
                         (verified automatically, see report.txt).
-  frames/<direction>/   procedurally assembled idle_NN / walk_NN frames,
-                        foot-baseline locked. Folder layout matches
-                        assets/sprites/characters/base/frames/ (drop-in).
+  frames/<direction>/<state>/default/frame_NN.png
+                        procedurally assembled idle / walk clips,
+                        foot-baseline locked. Folder layout matches the game.
   preview.png           contact sheet: one row per direction, static + all frames
   report.txt            baseline / silhouette / center-of-mass drift validation
 
@@ -439,11 +439,14 @@ def process_direction(path: Path, out_root: Path, args) -> tuple[str, dict, list
                       meta["baseline_y"], head_end, torso_end, direction)
 
     frames_dir = out_root / "frames" / direction
-    frames_dir.mkdir(parents=True, exist_ok=True)
+    idle_dir = frames_dir / "idle" / "default"
+    walk_dir = frames_dir / "walk" / "default"
+    idle_dir.mkdir(parents=True, exist_ok=True)
+    walk_dir.mkdir(parents=True, exist_ok=True)
     for i, frame in enumerate(idle, 1):
-        frame.save(frames_dir / f"idle_{i:02d}.png")
+        frame.save(idle_dir / f"frame_{i:02d}.png")
     for i, frame in enumerate(walk, 1):
-        frame.save(frames_dir / f"walk_{i:02d}.png")
+        frame.save(walk_dir / f"frame_{i:02d}.png")
 
     integrity = meta["integrity"]
     integrity_note = "parts reassemble EXACTLY" if integrity["exact"] else (

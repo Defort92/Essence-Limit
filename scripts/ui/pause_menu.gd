@@ -12,6 +12,7 @@ extends CanvasLayer
 
 ## Панель раздела «Управление», инстанцируется в _ready и прячется до вызова open().
 var _controls_panel: ControlsSettings = null
+var _developer_visual_panel: DeveloperVisualSettings = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_WHEN_PAUSED
@@ -23,6 +24,9 @@ func _ready() -> void:
 	_controls_panel = PauseMenuConstants.CONTROLS_SETTINGS_SCENE.instantiate()
 	add_child(_controls_panel)
 	_controls_panel.hide()
+	_developer_visual_panel = PauseMenuConstants.DEVELOPER_VISUAL_SETTINGS_SCENE.instantiate()
+	add_child(_developer_visual_panel)
+	_developer_visual_panel.hide()
 
 func _on_paused() -> void:
 	if _other_overlay_open():
@@ -32,6 +36,8 @@ func _on_paused() -> void:
 func _on_unpaused() -> void:
 	hide()
 	_settings_panel.hide()
+	if _developer_visual_panel != null:
+		_developer_visual_panel.hide()
 
 ## Не открываем меню поверх экрана, который сам держит паузу (сейчас — состояния).
 ## Непаусящие окна при Esc закрываются и не мешают обычному меню паузы.
@@ -60,6 +66,9 @@ func _on_settings_back_pressed() -> void:
 
 func _on_controls_pressed() -> void:
 	_controls_panel.open()
+
+func _on_developer_visual_settings_pressed() -> void:
+	_developer_visual_panel.open()
 
 func _on_volume_changed(value: float) -> void:
 	var master_bus: int = AudioServer.get_bus_index("Master")

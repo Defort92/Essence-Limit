@@ -14,14 +14,25 @@ enum Slot {
 	ACCESSORY,
 }
 
-enum WeaponType { NONE, MELEE_ONE_HAND, MELEE_TWO_HAND, RANGED, SHIELD }
+## MAGIC добавлен в конец, чтобы числовые значения уже сохранённых типов оружия
+## (особенно SHIELD) не изменились в старых сохранениях и .tres-файлах.
+enum WeaponType { NONE, MELEE_ONE_HAND, MELEE_TWO_HAND, RANGED, SHIELD, MAGIC }
 
 @export var slot: Slot = Slot.BODY
 @export var weapon_type: WeaponType = WeaponType.NONE
 ## Каталог 128x128 кадров отдельного визуального слоя экипировки.
-## Ожидаются подпапки направлений с idle_NN.png и run_NN.png.
+## Повторяет библиотеку тела: <direction>/<state>/<variant>/frame_NN.png.
+## Например: back/idle/default/frame_01.png и back/attack/light_01/frame_01.png.
 @export_dir var sprite_frames_dir: String = ""
 ## Optional non-destructive placement metadata authored by Equipment Alignment Editor.
 @export var alignment_profile: EquipmentAlignmentProfile
 ## Ключи — названия статов: "strength", "agility", "intellect", "max_health".
 @export var stat_bonuses: Dictionary = {}
+
+## Луки и магические посохи по правилам проекта всегда занимают обе руки.
+func is_two_handed_weapon() -> bool:
+	return weapon_type in [
+		WeaponType.MELEE_TWO_HAND,
+		WeaponType.RANGED,
+		WeaponType.MAGIC,
+	]
