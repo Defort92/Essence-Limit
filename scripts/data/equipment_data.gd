@@ -24,6 +24,8 @@ enum WeaponType { NONE, MELEE_ONE_HAND, MELEE_TWO_HAND, RANGED, SHIELD, MAGIC }
 ## Повторяет библиотеку тела: <direction>/<state>/<variant>/frame_NN.png.
 ## Например: back/idle/default/frame_01.png и back/attack/light_01/frame_01.png.
 @export_dir var sprite_frames_dir: String = ""
+## Optional non-destructive placement metadata authored by Equipment Alignment Editor.
+@export var alignment_profile: EquipmentAlignmentProfile
 ## Ключи — названия статов: "strength", "agility", "intellect", "max_health".
 @export var stat_bonuses: Dictionary = {}
 

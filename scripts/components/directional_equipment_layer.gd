@@ -5,17 +5,20 @@ class_name DirectionalEquipmentLayer3D
 
 
 @export var source_path: NodePath
+@export var alignment_profile: EquipmentAlignmentProfile
 
 var source_sprite: DirectionalSprite3D = null
 var _frames_dir: String = ""
 var _idle_frames: Array = []
 var _movement_frames: Array = []
 var _named_clip_frames: Dictionary = {}
+var _base_sprite_offset: Vector2 = Vector2.ZERO
 
 static var _shared_frames_cache: Dictionary = {}
 
 
 func _ready() -> void:
+	_base_sprite_offset = offset
 	if source_sprite == null and not source_path.is_empty():
 		source_sprite = get_node_or_null(source_path) as DirectionalSprite3D
 	if source_sprite != null:
@@ -38,11 +41,25 @@ func set_frames_dir(frames_dir: String) -> void:
 	_movement_frames = []
 	_named_clip_frames.clear()
 	texture = null
+	offset = _base_sprite_offset
 	visible = false
 	if _frames_dir.is_empty():
 		return
 	_load_frames()
 	_sync_frame()
+
+
+func set_alignment_profile(profile: EquipmentAlignmentProfile) -> void:
+	alignment_profile = profile
+	_sync_frame()
+
+
+func set_equipment_visual(
+	frames_dir: String,
+	profile: EquipmentAlignmentProfile = null
+) -> void:
+	alignment_profile = profile
+	set_frames_dir(frames_dir)
 
 
 func _load_frames() -> void:
@@ -65,20 +82,8 @@ func _load_frames() -> void:
 			var direction_dir := _frames_dir.path_join(
 				DirectionalSpriteConstants.DIR_FOLDERS[source_sector]
 			)
-			var idle_series := _load_series(
-				direction_dir.path_join("idle").path_join("default"),
-				"frame"
-			)
-			if idle_series.is_empty():
-				idle_series = _load_series(direction_dir, "idle")
-			var movement_series := _load_series(
-				direction_dir.path_join("run").path_join("default"),
-				"frame"
-			)
-			if movement_series.is_empty():
-				movement_series = _load_series(direction_dir, "run")
-			idle_by_source[source_sector] = idle_series
-			movement_by_source[source_sector] = movement_series
+			idle_by_source[source_sector] = _load_clip_series(direction_dir, "idle")
+			movement_by_source[source_sector] = _load_clip_series(direction_dir, "run")
 		_idle_frames[sector] = idle_by_source[source_sector]
 		_movement_frames[sector] = movement_by_source[source_sector]
 
@@ -126,6 +131,17 @@ func _load_directional_clip(state: StringName, variant: StringName) -> Array:
 	return clip_frames
 
 
+## Supports both direction/idle_01.png and direction/idle/default/frame_01.png.
+func _load_clip_series(direction_dir: String, animation: String) -> Array[Texture2D]:
+	var frames := _load_series(
+		direction_dir.path_join(animation).path_join("default"),
+		"frame"
+	)
+	if frames.is_empty():
+		frames = _load_series(direction_dir, animation)
+	return frames
+
+
 func _load_series(directory: String, prefix: String) -> Array[Texture2D]:
 	var frames: Array[Texture2D] = []
 	var index := 1
@@ -147,10 +163,12 @@ func _process(_delta: float) -> void:
 
 func _sync_frame() -> void:
 	if source_sprite == null or _frames_dir.is_empty():
+		offset = _base_sprite_offset
 		visible = false
 		return
 	var sector := source_sprite.get_current_sector()
 	if sector < 0 or sector >= 8:
+		offset = _base_sprite_offset
 		visible = false
 		return
 	var state := source_sprite.get_current_animation_state()
@@ -164,6 +182,7 @@ func _sync_frame() -> void:
 		if not clip_frames.is_empty():
 			series = clip_frames[sector]
 	if series.is_empty():
+		offset = _base_sprite_offset
 		visible = false
 		return
 	var frame_index := mini(
@@ -172,7 +191,24 @@ func _sync_frame() -> void:
 	)
 	texture = series[frame_index]
 	flip_h = source_sprite.flip_h
+	var alignment_offset := Vector2.ZERO
+	if alignment_profile != null:
+		var source_sector := sector
+		var mirror_source := DirectionalSpriteConstants.MIRROR_SOURCE_SECTORS[sector]
+		if mirror_source >= 0:
+			source_sector = mirror_source
+		alignment_offset = alignment_profile.get_offset(
+			DirectionalSpriteConstants.DIR_FOLDERS[source_sector],
+			state,
+			frame_index,
+			flip_h
+		)
+	offset = _base_sprite_offset + alignment_offset
 	visible = true
+
+
+func get_applied_alignment_offset() -> Vector2:
+	return offset - _base_sprite_offset
 
 
 func get_animation_frame_count(sector: int, moving: bool) -> int:

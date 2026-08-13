@@ -9,6 +9,9 @@ const WEAPON_FRAMES := {
 const EQUIPMENT_LAYER_SCRIPT := preload(
 	"res://scripts/components/directional_equipment_layer.gd"
 )
+const ALIGNMENT_PROFILE_SCRIPT := preload(
+	"res://scripts/data/equipment_alignment_profile.gd"
+)
 const DIRECTIONS: Array[Vector3] = [
 	Vector3(0.0, 0.0, 1.0), Vector3(1.0, 0.0, 1.0),
 	Vector3(1.0, 0.0, 0.0), Vector3(1.0, 0.0, -1.0),
@@ -26,13 +29,19 @@ func _run_test() -> void:
 	body.frames_dir = BODY_FRAMES
 	root.add_child(body)
 
-	var layer := EQUIPMENT_LAYER_SCRIPT.new()
+	var layer: DirectionalEquipmentLayer3D = EQUIPMENT_LAYER_SCRIPT.new()
 	layer.source_sprite = body
 	root.add_child(layer)
 	await process_frame
+	var profile: EquipmentAlignmentProfile = ALIGNMENT_PROFILE_SCRIPT.new()
+	profile.set_frame_total_offset(&"front", &"run", 0, Vector2(3.0, 2.0))
+	profile.set_frame_total_offset(&"front-right", &"run", 0, Vector2(4.0, 1.0))
 
 	for weapon_name: String in WEAPON_FRAMES:
-		layer.set_frames_dir(WEAPON_FRAMES[weapon_name])
+		layer.set_equipment_visual(
+			WEAPON_FRAMES[weapon_name],
+			profile if weapon_name == "Sword" else null
+		)
 		for sector in 8:
 			if layer.get_animation_frame_count(sector, false) != 4:
 				push_error("%s idle frame count mismatch in sector %d." % [weapon_name, sector])
@@ -55,8 +64,24 @@ func _run_test() -> void:
 				push_error("%s mirror mismatch in sector %d." % [weapon_name, sector])
 				quit(1)
 				return
+			if (
+				weapon_name == "Sword"
+				and sector == 0
+				and layer.get_applied_alignment_offset() != Vector2(3.0, 2.0)
+			):
+				push_error("Front alignment profile was not applied.")
+				quit(1)
+				return
+			if (
+				weapon_name == "Sword"
+				and sector == 7
+				and layer.get_applied_alignment_offset() != Vector2(-4.0, 1.0)
+			):
+				push_error("Mirrored alignment did not negate the X offset.")
+				quit(1)
+				return
 
-	layer.set_frames_dir(WEAPON_FRAMES["Sword"])
+	layer.set_equipment_visual(WEAPON_FRAMES["Sword"], profile)
 
 	body.face_direction(DIRECTIONS[4])
 	body.set_moving(false)
@@ -75,10 +100,10 @@ func _run_test() -> void:
 		return
 
 	layer.set_frames_dir("")
-	if layer.visible or layer.texture != null:
+	if layer.visible or layer.texture != null or not layer.offset.is_zero_approx():
 		push_error("Sword layer did not clear after unequip.")
 		quit(1)
 		return
 
-	print("[DirectionalEquipmentLayerTest] PASS: 3 weapons, idle, run, mirror, unequip.")
+	print("[DirectionalEquipmentLayerTest] PASS: 3 weapons, phase, alignment, mirror, unequip.")
 	quit()
